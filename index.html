@@ -37,6 +37,37 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── LOADING OVERLAY ─── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--sky);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity .4s ease;
+}
+.loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--sky2);
+  border-top-color: var(--ocean);
+  border-radius: 50%;
+  animation: spin-load .8s linear infinite;
+}
+@keyframes spin-load { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 15px;
+  color: var(--mid);
+}
+
 /* ─── HERO ─── */
 .hero {
   position: relative;
@@ -111,6 +142,25 @@ body {
   line-height: 0;
 }
 .hero-wave svg { display: block; width: 100%; }
+
+/* ─── SYNC INDICATOR ─── */
+.sync-indicator {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ocean);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 100px;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.sync-indicator.visible { opacity: 1; }
+.sync-indicator.error { background: var(--coral); }
 
 /* ─── TAB BAR ─── */
 .tab-bar {
@@ -188,6 +238,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .action-btn:hover { background: var(--ocean2); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ─── DAY CARDS ─── */
 .day-card {
@@ -263,7 +314,7 @@ body {
 /* ─── TIMELINE ─── */
 .timeline {
   padding: 8px 18px 16px;
-  display: none; /* collapsed by default */
+  display: none;
 }
 .timeline.open { display: block; }
 .tl-row {
@@ -725,6 +776,15 @@ body {
 </head>
 <body>
 
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <p class="loading-text">データを読み込み中…</p>
+</div>
+
+<!-- SYNC INDICATOR -->
+<div class="sync-indicator" id="syncIndicator">保存中…</div>
+
 <!-- HERO -->
 <div class="hero">
   <div class="sun-spin">☀️</div>
@@ -917,19 +977,19 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const SUPABASE_URL = "https://qqjiyrqfxjdmmghuwzex.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaml5cnFmeGpkbW1naHV3emV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTUwNDcsImV4cCI6MjA5NTg5MTA0N30.FHEATyLy8iyaUrzOtwBUD4PUo82PMlPX-H9qk2Hwguw";
-  
-  const supabaseClient = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
-  
-  const shareCode =
-    new URLSearchParams(location.search).get("trip") ||
-    "default";
 // ══════════════════════════════════════════════════════
-//  DATA — PACKING (preset, user can delete items)
+//  SUPABASE SETUP
+// ══════════════════════════════════════════════════════
+const SUPABASE_URL     = "https://qqjiyrqfxjdmmghuwzex.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaml5cnFmeGpkbW1naHV3emV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTUwNDcsImV4cCI6MjA5NTg5MTA0N30.FHEATyLy8iyaUrzOtwBUD4PUo82PMlPX-H9qk2Hwguw";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// URLパラメータで旅行コードを切り替え可能
+const shareCode = new URLSearchParams(location.search).get("trip") || "default";
+
+// ══════════════════════════════════════════════════════
+//  DEFAULT PACKING LIST（プリセット）
 // ══════════════════════════════════════════════════════
 const DEFAULT_PACK = [
   {id:'docs',icon:'🛂',name:'書類・貴重品',items:[
@@ -981,7 +1041,7 @@ const DEFAULT_PACK = [
     {id:'h6',name:'アフターサン（日焼けケア）',note:'',p:'med'},
     {id:'h7',name:'除菌シート・ウェットティッシュ',note:'',p:'med'},
   ]},
-  {id:'travel',icon:'🧳',name:'旅行用品',items:[
+  {id:'travel_gear',icon:'🧳',name:'旅行用品',items:[
     {id:'tr1',name:'スーツケース（機内預け）',note:'重量制限確認：通常23kg',p:'high'},
     {id:'tr2',name:'キャリーバッグ（機内持ち込み）',note:'7〜10kg以内',p:'high'},
     {id:'tr3',name:'ネックピロー',note:'機内での長時間フライトに',p:'med'},
@@ -1000,51 +1060,104 @@ const DEFAULT_PACK = [
 ];
 
 // ══════════════════════════════════════════════════════
-//  STATE & PERSISTENCE
+//  STATE
+//  S は必ず loadState() で初期化してから使う
 // ══════════════════════════════════════════════════════
-const SK = 'hawaii_planner_v4';
-
-async function loadState() {
-
-  const { data, error } = await supabaseClient
-    .from("trip_plans")
-    .select("data")
-    .eq("share_code", shareCode)
-    .single();
-
-  if (error || !data) {
-    return {
-      days: [],
-      memos: [],
-      packChecked: {},
-      packDeleted: {}
-    };
-  }
-
-  return data.data;
-}
-
-async function saveState() {
-
-  await supabaseClient
-    .from("trip_plans")
-    .upsert({
-      share_code: shareCode,
-      data: S,
-      updated_at: new Date().toISOString()
-    });
-}
-
 let S = {
-  days: [],
-  memos: [],
-  packChecked: {},
-  packDeleted: {}
+  days:        [],   // 旅程
+  memos:       [],   // メモ
+  packChecked: {},   // { itemId: true }
+  packDeleted: {},   // { itemId: true }
 };
-if (!S.days)        S.days = [];
-if (!S.memos)       S.memos = [];
-if (!S.packChecked) S.packChecked = {};
-if (!S.packDeleted) S.packDeleted = {};
+
+// Realtime の重複更新を防ぐフラグ
+let isSaving = false;
+
+// ══════════════════════════════════════════════════════
+//  DB HELPERS
+// ══════════════════════════════════════════════════════
+
+/**
+ * Supabase から状態を読み込む。
+ * レコードがなければデフォルト値を返す。
+ */
+async function loadState() {
+  try {
+    const { data, error } = await db
+      .from("trip_plans")
+      .select("data")
+      .eq("share_code", shareCode)
+      .maybeSingle();   // レコードなし → null（エラーにならない）
+
+    if (error) {
+      console.error("loadState error:", error);
+      return;
+    }
+
+    if (data && data.data) {
+      // DB の値をマージ（欠けているキーはデフォルト値で補完）
+      S = {
+        days:        Array.isArray(data.data.days)        ? data.data.days        : [],
+        memos:       Array.isArray(data.data.memos)       ? data.data.memos       : [],
+        packChecked: data.data.packChecked && typeof data.data.packChecked === 'object' ? data.data.packChecked : {},
+        packDeleted: data.data.packDeleted && typeof data.data.packDeleted === 'object' ? data.data.packDeleted : {},
+      };
+    }
+    // data === null の場合は S のデフォルト値をそのまま使う
+  } catch (e) {
+    console.error("loadState exception:", e);
+  }
+}
+
+/** シンクインジケータを表示して自動的に消す */
+let syncTimer = null;
+function showSync(msg = '保存中…', isError = false) {
+  const el = document.getElementById('syncIndicator');
+  el.textContent = msg;
+  el.classList.toggle('error', isError);
+  el.classList.add('visible');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => el.classList.remove('visible'), 1800);
+}
+
+/**
+ * 現在の S を Supabase に upsert する。
+ * 保存中は重複保存しない（楽観的ロック簡易版）。
+ */
+async function saveState() {
+  isSaving = true;
+  showSync('保存中…');
+  try {
+    const { error } = await db
+      .from("trip_plans")
+      .upsert({
+        share_code: shareCode,
+        data: S,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'share_code' });
+
+    if (error) {
+      console.error("saveState error:", error);
+      showSync('保存失敗 ⚠️', true);
+    } else {
+      showSync('保存しました ✓');
+    }
+  } catch (e) {
+    console.error("saveState exception:", e);
+    showSync('保存失敗 ⚠️', true);
+  } finally {
+    isSaving = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  全画面一括レンダリング
+// ══════════════════════════════════════════════════════
+function renderAll() {
+  renderItn();
+  renderMemos();
+  renderPack();
+}
 
 // ══════════════════════════════════════════════════════
 //  TABS
@@ -1068,8 +1181,8 @@ const TYPE_META = {
   activity: { lbl: 'アクティビティ', bc: 'b-activity',  dc: 't-activity' },
 };
 
-let editDayId = null;
-let editEvId  = null;
+let editDayId   = null;
+let editEvId    = null;
 let editEvDayId = null;
 
 function renderItn() {
@@ -1159,6 +1272,7 @@ function openDayModal(dayId) {
   document.getElementById('dayModal').classList.add('open');
 }
 function closeDayModal() { document.getElementById('dayModal').classList.remove('open'); }
+
 async function saveDay() {
   const label = document.getElementById('dayLabel').value.trim();
   if (!label) { alert('ラベルを入力してください'); return; }
@@ -1180,12 +1294,17 @@ async function saveDay() {
       events: [],
     });
   }
-  await saveState(); renderItn(); closeDayModal();
+  closeDayModal();
+  renderItn();
+  await saveState();
 }
+
 async function deleteDay() {
   if (!confirm(`「${S.days.find(d=>d.id===editDayId)?.label}」を削除しますか？`)) return;
   S.days = S.days.filter(d => d.id !== editDayId);
-  await saveState(); renderItn(); closeDayModal();
+  closeDayModal();
+  renderItn();
+  await saveState();
 }
 
 /* ── Event Modal ── */
@@ -1212,6 +1331,7 @@ function openEvModal(dayId, evId) {
   document.getElementById('evModal').classList.add('open');
 }
 function closeEvModal() { document.getElementById('evModal').classList.remove('open'); }
+
 async function saveEv() {
   const name = document.getElementById('evName').value.trim();
   if (!name) { alert('名前を入力してください'); return; }
@@ -1228,24 +1348,32 @@ async function saveEv() {
     day.events[idx] = ev;
   } else {
     day.events.push(ev);
-    day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }
-  await saveState(); renderItn(); closeEvModal();
-  // re-open timeline
+  // 時間順ソート
+  day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+  const targetDayId = editEvDayId;
+  closeEvModal();
+  renderItn();
+  // タイムラインを開いておく
   setTimeout(() => {
-    const tl = document.getElementById('tl_' + editEvDayId);
-    const chev = document.getElementById('chev_' + editEvDayId);
+    const tl   = document.getElementById('tl_' + targetDayId);
+    const chev = document.getElementById('chev_' + targetDayId);
     if (tl && !tl.classList.contains('open')) {
       tl.classList.add('open');
       if (chev) chev.classList.add('open');
     }
   }, 50);
+  await saveState();
 }
+
 async function deleteEv() {
   const day = S.days.find(d => d.id === editEvDayId);
   if (!confirm(`「${day.events.find(e=>e.id===editEvId)?.name}」を削除しますか？`)) return;
   day.events = day.events.filter(e => e.id !== editEvId);
-  await saveState(); renderItn(); closeEvModal();
+  closeEvModal();
+  renderItn();
+  await saveState();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1256,7 +1384,7 @@ const MEMO_COLOR_MAP = { ocean: '', coral: ' c-coral', leaf: ' c-leaf', sun: ' c
 
 function renderMemos() {
   const l = document.getElementById('memoList');
-  if (!S.memos.length) {
+  if (!S.memos || !S.memos.length) {
     l.innerHTML = `<div class="memo-empty">
       <div class="memo-empty-icon">📄</div>
       <div class="memo-empty-text">メモはまだありません</div>
@@ -1292,6 +1420,7 @@ function openMemoModal(id) {
   document.getElementById('memoModal').classList.add('open');
 }
 function closeMemoModal() { document.getElementById('memoModal').classList.remove('open'); }
+
 async function saveMemo() {
   const title = document.getElementById('memoTitleIn').value.trim();
   const body  = document.getElementById('memoBodyIn').value.trim();
@@ -1299,16 +1428,30 @@ async function saveMemo() {
   const now = Date.now();
   if (editMemoId) {
     const m = S.memos.find(x => x.id === editMemoId);
-    m.title = title; m.body = body; m.color = document.getElementById('memoColorIn').value; m.updatedAt = now;
+    m.title     = title;
+    m.body      = body;
+    m.color     = document.getElementById('memoColorIn').value;
+    m.updatedAt = now;
   } else {
-    S.memos.unshift({ id: 'm_' + now, title, body, color: document.getElementById('memoColorIn').value, updatedAt: now });
+    S.memos.unshift({
+      id:        'm_' + now,
+      title,
+      body,
+      color:     document.getElementById('memoColorIn').value,
+      updatedAt: now,
+    });
   }
-  await saveState(); renderMemos(); closeMemoModal();
+  closeMemoModal();
+  renderMemos();
+  await saveState();
 }
+
 async function deleteMemo() {
   if (!confirm('このメモを削除しますか？')) return;
   S.memos = S.memos.filter(x => x.id !== editMemoId);
-  await saveState(); renderMemos(); closeMemoModal();
+  closeMemoModal();
+  renderMemos();
+  await saveState();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1325,22 +1468,31 @@ function packFilter(f) {
   renderPack();
 }
 function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
+
 async function packReset() {
   if (!confirm('すべてのチェックをリセットしますか？')) return;
   S.packChecked = {};
-  await saveState(); renderPack();
+  renderPack();
+  await saveState();
 }
+
 async function togglePack(itemId) {
+  // 現在の状態を反転
   S.packChecked[itemId] = !S.packChecked[itemId];
-  await saveState(); renderPack();
+  // false になった場合はキーを削除してオブジェクトをクリーンに保つ
+  if (!S.packChecked[itemId]) delete S.packChecked[itemId];
+  renderPack();
   if (S.packChecked[itemId]) confetti();
+  await saveState();
 }
+
 async function deletePackItem(itemId, e) {
   e.stopPropagation();
   if (!confirm('このアイテムを削除しますか？')) return;
   S.packDeleted[itemId] = true;
   delete S.packChecked[itemId];
-  await saveState(); renderPack();
+  renderPack();
+  await saveState();
 }
 
 function renderPack() {
@@ -1354,8 +1506,11 @@ function renderPack() {
 
     const rows = activeItems.map(item => {
       const chk = !!S.packChecked[item.id];
-      total++; if (chk) { done++; secDone++; }
-      const matchQ = !packQ || item.name.toLowerCase().includes(packQ) || (item.note || '').toLowerCase().includes(packQ);
+      total++;
+      if (chk) { done++; secDone++; }
+      const matchQ = !packQ
+        || item.name.toLowerCase().includes(packQ)
+        || (item.note || '').toLowerCase().includes(packQ);
       const matchF = packFlt === 'all'
         || (packFlt === 'checked'   && chk)
         || (packFlt === 'unchecked' && !chk);
@@ -1364,7 +1519,7 @@ function renderPack() {
 
     if (!rows.some(r => r.vis)) return;
 
-    const allDone  = activeItems.length > 0 && secDone === activeItems.length;
+    const allDone = activeItems.length > 0 && secDone === activeItems.length;
     const wrap = document.createElement('div');
     wrap.className = 'psec';
     wrap.innerHTML = `
@@ -1404,7 +1559,6 @@ function togglePSec(listId, hdr) {
   const list = document.getElementById(listId);
   const chev = hdr.querySelector('.psec-chev');
   const open = list.style.display !== 'none' && list.style.display !== '';
-  // pitems-list defaults to block (open). We toggle it.
   list.style.display = open ? 'none' : '';
   hdr.classList.toggle('collapsed', open);
   chev.classList.toggle('open', !open);
@@ -1414,7 +1568,9 @@ function togglePSec(listId, hdr) {
 //  MODAL HELPERS
 // ══════════════════════════════════════════════════════
 function overlayClose(e, id) {
-  if (e.target === e.currentTarget) document.getElementById(id).classList.remove('open');
+  if (e.target === e.currentTarget) {
+    document.getElementById(id).classList.remove('open');
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1439,20 +1595,27 @@ function confetti() {
   }
 }
 
-supabaseClient
-  .channel('trip_plans')
+// ══════════════════════════════════════════════════════
+//  REALTIME — 他のタブ・ユーザーの変更をリアルタイム反映
+//  自分の保存（isSaving=true）中は無視して二重レンダリングを防ぐ
+// ══════════════════════════════════════════════════════
+db.channel('trip_plans_realtime')
   .on(
     'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'trip_plans'
-    },
-    async () => {
-      S = await loadState();
-      renderItn();
-      renderMemos();
-      renderPack();
+    { event: '*', schema: 'public', table: 'trip_plans', filter: `share_code=eq.${shareCode}` },
+    async (payload) => {
+      if (isSaving) return; // 自分の保存によるイベントは無視
+      if (payload.new && payload.new.data) {
+        const d = payload.new.data;
+        S = {
+          days:        Array.isArray(d.days)        ? d.days        : [],
+          memos:       Array.isArray(d.memos)       ? d.memos       : [],
+          packChecked: d.packChecked && typeof d.packChecked === 'object' ? d.packChecked : {},
+          packDeleted: d.packDeleted && typeof d.packDeleted === 'object' ? d.packDeleted : {},
+        };
+        renderAll();
+        showSync('同期しました ↻');
+      }
     }
   )
   .subscribe();
@@ -1461,10 +1624,13 @@ supabaseClient
 //  INIT
 // ══════════════════════════════════════════════════════
 (async () => {
-  S = await loadState();
-  renderItn();
-  renderMemos();
-  renderPack();
+  await loadState();   // ← DB から読み込んでから
+  renderAll();         // ← レンダリング
+
+  // ローディング画面を非表示
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500);
 })();
 </script>
 </body>
