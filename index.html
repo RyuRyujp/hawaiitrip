@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🌺 Hawaii Trip Planner</title>
+<style>
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ocean: #0A6880;
+  --ocean2: #1597B8;
+  --sand: #F5EDD8;
+  --coral: #E86B4E;
+  --leaf: #3A7D44;
+  --sun: #D4A017;
+  --dark: #162830;
+  --mid: #4A6572;
+  --light: #ffffff;
+  --sky: #EAF7FB;
+  --sky2: #D0ECF5;
+  --border: #C8E3EE;
+  --r: 14px;
+  --shadow: 0 2px 16px rgba(10,104,128,.10);
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  background: var(--sky);
+  color: var(--dark);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── HERO ─── */
+.hero {
+  position: relative;
+  background: linear-gradient(155deg, #0A5870 0%, #0D8FB5 55%, #1AADDA 100%);
+  color: #fff;
+  padding: 48px 20px 96px;
+  text-align: center;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 65% 55% at 50% 0%, rgba(26,173,218,.4) 0%, transparent 70%);
+}
+.sun-spin {
+  position: absolute;
+  top: 14px; right: 18px;
+  font-size: 54px;
+  opacity: .13;
+  animation: spin 24s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hero-eyebrow {
+  font-size: 11px;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.55);
+  margin-bottom: 10px;
+  position: relative;
+}
+.hero-title {
+  font-size: clamp(36px, 8vw, 58px);
+  font-weight: 700;
+  letter-spacing: .5px;
+  line-height: 1.05;
+  position: relative;
+}
+.hero-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,.62);
+  margin-top: 8px;
+  position: relative;
+}
+.hero-progress-wrap {
+  max-width: 300px;
+  margin: 18px auto 0;
+  position: relative;
+}
+.hero-progress-track {
+  height: 5px;
+  background: rgba(255,255,255,.2);
+  border-radius: 3px;
+}
+.hero-progress-bar {
+  height: 100%;
+  background: #fff;
+  border-radius: 3px;
+  transition: width .5s ease;
+  width: 0%;
+}
+.hero-progress-label {
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+  margin-top: 7px;
+  text-align: center;
+}
+.hero-wave {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  line-height: 0;
+}
+.hero-wave svg { display: block; width: 100%; }
+
+/* ─── TAB BAR ─── */
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--light);
+  border-bottom: 2px solid var(--sky2);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: 13px 8px 11px;
+  border: none;
+  background: transparent;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 13px;
+  color: var(--mid);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all .2s;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn .tab-icon { font-size: 20px; }
+.tab-btn.active { color: var(--ocean); border-bottom-color: var(--ocean); font-weight: 600; }
+.tab-btn:hover:not(.active) { background: var(--sky); color: var(--dark); }
+
+/* ─── PAGES ─── */
+.page { display: none; animation: fadeUp .28s ease both; }
+.page.active { display: block; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.page-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+/* ─── SECTION HEADING ─── */
+.sec-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ocean);
+  margin-bottom: 18px;
+}
+
+/* ─── ACTION BUTTON ─── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: var(--ocean);
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.action-btn:hover { background: var(--ocean2); }
+
+/* ─── DAY CARDS ─── */
+.day-card {
+  margin-bottom: 16px;
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: var(--light);
+}
+.day-hdr {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.day-num {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: .75;
+  min-width: 44px;
+}
+.day-info { flex: 1; min-width: 0; }
+.day-label { font-size: 15px; font-weight: 700; }
+.day-date-text { font-size: 12px; color: rgba(255,255,255,.62); margin-top: 1px; }
+.day-hotel-badge {
+  font-size: 11px;
+  background: rgba(255,255,255,.2);
+  border-radius: 100px;
+  padding: 3px 10px;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.day-hdr-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,.18);
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { background: rgba(255,255,255,.3); }
+.day-chev {
+  font-size: 12px;
+  opacity: .65;
+  transition: transform .25s;
+  flex-shrink: 0;
+}
+.day-chev.open { transform: rotate(180deg); }
+
+/* ─── TIMELINE ─── */
+.timeline {
+  padding: 8px 18px 16px;
+  display: none; /* collapsed by default */
+}
+.timeline.open { display: block; }
+.tl-row {
+  display: flex;
+  gap: 12px;
+  padding: 9px 0;
+  position: relative;
+}
+.tl-row:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 67px;
+  top: 34px;
+  bottom: -9px;
+  width: 2px;
+  background: var(--sky2);
+}
+.tl-time-col {
+  width: 46px;
+  text-align: right;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+.tl-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ocean2);
+  line-height: 1;
+}
+.tl-dot-wrap {
+  width: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+}
+.tl-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--light);
+  box-shadow: 0 0 0 2px var(--ocean);
+  background: var(--ocean);
+}
+.tl-dot.t-flight  { background: var(--dark);  box-shadow: 0 0 0 2px var(--dark); }
+.tl-dot.t-food    { background: var(--coral); box-shadow: 0 0 0 2px var(--coral); }
+.tl-dot.t-sight   { background: var(--leaf);  box-shadow: 0 0 0 2px var(--leaf); }
+.tl-dot.t-hotel   { background: var(--sun);   box-shadow: 0 0 0 2px var(--sun); }
+.tl-dot.t-beach   { background: var(--ocean2);box-shadow: 0 0 0 2px var(--ocean2); }
+.tl-dot.t-activity{ background: #7B5EA8;      box-shadow: 0 0 0 2px #7B5EA8; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-badge {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: .4px;
+  border-radius: 100px;
+  padding: 2px 8px;
+  margin-bottom: 2px;
+}
+.b-flight   { background: #e8ecef; color: var(--dark); }
+.b-food     { background: #fdecea; color: var(--coral); }
+.b-sight    { background: #e6f3e8; color: var(--leaf); }
+.b-hotel    { background: #fdf8e6; color: #7a5e00; }
+.b-beach    { background: #e0f3f9; color: var(--ocean); }
+.b-activity { background: #f0eafa; color: #6b3fa0; }
+.tl-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dark);
+}
+.tl-note {
+  font-size: 13px;
+  color: var(--mid);
+  margin-top: 3px;
+  line-height: 1.55;
+}
+.tl-edit-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background .15s;
+  margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl-edit-btn:hover { background: var(--sky); }
+
+.tl-add-wrap {
+  border-top: 1px dashed var(--sky2);
+  margin-top: 6px;
+  padding-top: 2px;
+}
+.tl-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  color: var(--ocean2);
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl-add-btn:hover { color: var(--ocean); }
+
+/* ─── ITINERARY TOP BAR ─── */
+.itn-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* ─── MEMO ─── */
+.memo-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.memo-card {
+  background: var(--light);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--ocean);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.memo-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(10,104,128,.13); }
+.memo-card.c-coral { border-left-color: var(--coral); }
+.memo-card.c-leaf  { border-left-color: var(--leaf); }
+.memo-card.c-sun   { border-left-color: var(--sun); }
+.memo-card-title { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
+.memo-card-body  { font-size: 14px; color: var(--mid); line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.memo-card-meta  { font-size: 11px; color: #aac0c8; margin-top: 10px; }
+.memo-empty {
+  text-align: center;
+  padding: 56px 20px;
+  color: var(--mid);
+}
+.memo-empty-icon { font-size: 48px; opacity: .3; margin-bottom: 14px; }
+.memo-empty-text { font-size: 15px; }
+.memo-empty-hint { font-size: 13px; color: #aac0c8; margin-top: 6px; }
+
+/* ─── PACKING ─── */
+.pack-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.pack-stat {
+  flex: 1;
+  min-width: 72px;
+  background: var(--light);
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.pstat-num {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ocean);
+  line-height: 1;
+}
+.pstat-lbl { font-size: 11px; color: var(--mid); margin-top: 4px; }
+
+.pack-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 13px;
+  padding: 8px 15px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: var(--light);
+  color: var(--mid);
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pill:hover { border-color: var(--ocean2); color: var(--ocean); }
+.pill.active { background: var(--ocean); border-color: var(--ocean); color: #fff; }
+
+.srch-wrap { position: relative; margin-bottom: 16px; }
+.srch-wrap input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--light);
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--dark);
+  outline: none;
+  transition: border-color .2s;
+}
+.srch-wrap input:focus { border-color: var(--ocean2); }
+.srch-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--mid); pointer-events: none; }
+
+.legend {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--mid);
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.ldot { width: 8px; height: 8px; border-radius: 50%; }
+
+.psec { margin-bottom: 14px; }
+.psec-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  background: var(--light);
+  border: 1.5px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.psec-hdr:hover { background: var(--sky); }
+.psec-hdr.collapsed { border-radius: 14px; border-bottom-width: 1.5px; }
+.psec-icon { font-size: 20px; }
+.psec-name { font-size: 15px; font-weight: 600; flex: 1; }
+.psec-count {
+  font-size: 12px;
+  background: var(--sky);
+  color: var(--ocean);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+.psec-count.all-done { background: #e6f5e9; color: var(--leaf); }
+.psec-chev { font-size: 12px; color: var(--mid); transition: transform .25s; }
+.psec-chev.open { transform: rotate(180deg); }
+
+.pitems-list {
+  background: var(--light);
+  border: 1.5px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+.pitem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(10,104,128,.06);
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pitem:last-child { border-bottom: none; }
+.pitem:hover { background: var(--sky); }
+.pitem.checked { background: #f8fdf9; }
+.pitem.hidden { display: none; }
+.pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+.pdot.high { background: var(--coral); }
+.pdot.med  { background: var(--sun); }
+.pdot.low  { background: transparent; }
+.pchk {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(10,104,128,.25);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all .2s;
+}
+.pitem.checked .pchk { background: var(--leaf); border-color: var(--leaf); }
+.ptick { color: #fff; font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .2s; }
+.pitem.checked .ptick { opacity: 1; }
+.pbody { flex: 1; min-width: 0; }
+.pname { font-size: 15px; color: var(--dark); transition: all .2s; }
+.pitem.checked .pname { color: #94a3a8; text-decoration: line-through; }
+.pnote { font-size: 12px; color: var(--mid); margin-top: 2px; line-height: 1.5; }
+.pdel-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #c0ccd0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 5px;
+  transition: all .15s;
+  margin-top: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pdel-btn:hover { background: #fdecea; color: var(--coral); }
+
+/* ─── MODAL ─── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(22,40,48,.52);
+  z-index: 500;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--light);
+  border-radius: 22px 22px 0 0;
+  width: 100%;
+  max-width: 540px;
+  padding: 28px 24px 40px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  animation: slideUp .24s ease both;
+}
+@keyframes slideUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.modal-handle {
+  width: 44px; height: 5px;
+  background: #d0dde3;
+  border-radius: 3px;
+  margin: 0 auto 20px;
+}
+.modal h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ocean);
+  margin-bottom: 16px;
+}
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  color: var(--mid);
+  margin-top: 14px;
+  margin-bottom: 5px;
+}
+.form-label:first-of-type { margin-top: 0; }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--dark);
+  background: var(--sky);
+  outline: none;
+  transition: border-color .2s, background .2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--ocean2);
+  background: #fff;
+}
+.form-textarea { height: 88px; resize: none; }
+.modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+.btn-primary {
+  flex: 1;
+  padding: 13px;
+  background: var(--ocean);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary:hover { background: var(--ocean2); }
+.btn-ghost {
+  padding: 13px 16px;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--mid);
+  cursor: pointer;
+  transition: border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-ghost:hover { border-color: var(--ocean2); }
+.btn-danger {
+  padding: 13px 14px;
+  background: #fdecea;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--coral);
+  cursor: pointer;
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-danger:hover { background: #fbd5d0; }
+
+/* ─── EMPTY STATE ─── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--mid);
+}
+.empty-icon { font-size: 52px; opacity: .3; margin-bottom: 14px; }
+.empty-text { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.empty-hint { font-size: 14px; color: #aac0c8; }
+
+/* ─── CONFETTI ─── */
+.cfwrap { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+.cfp {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  animation: cfall linear forwards;
+}
+@keyframes cfall {
+  0%   { transform: translateY(-10px) rotate(0);    opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="sun-spin">☀️</div>
+  <p class="hero-eyebrow">Hawaii Trip Planner</p>
+  <h1 class="hero-title">🌺 Aloha, Hawaii</h1>
+  <p class="hero-sub">旅程 · メモ · 持ち物リスト</p>
+  <div class="hero-progress-wrap">
+    <div class="hero-progress-track">
+      <div class="hero-progress-bar" id="heroBar"></div>
+    </div>
+    <p class="hero-progress-label" id="heroLbl">持ち物 0 / 0 準備完了</p>
+  </div>
+  <div class="hero-wave">
+    <svg viewBox="0 0 1440 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 32C180 64 360 0 540 32C720 64 900 0 1080 32C1260 64 1380 16 1440 32V64H0V32Z" fill="#EAF7FB"/>
+    </svg>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('itinerary', this)">
+    <span class="tab-icon">🗓️</span>旅程
+  </button>
+  <button class="tab-btn" onclick="switchTab('memo', this)">
+    <span class="tab-icon">📝</span>メモ
+  </button>
+  <button class="tab-btn" onclick="switchTab('packing', this)">
+    <span class="tab-icon">🧳</span>持ち物
+  </button>
+</nav>
+
+<!-- ══════════ ITINERARY PAGE ══════════ -->
+<div class="page active" id="page-itinerary">
+  <div class="page-inner">
+    <div class="itn-top-bar">
+      <div class="sec-heading">🗓️ 旅程</div>
+      <button class="action-btn" onclick="openDayModal(null)">＋ 日程を追加</button>
+    </div>
+    <div id="itnContainer">
+      <div class="empty-state">
+        <div class="empty-icon">🗓️</div>
+        <div class="empty-text">旅程がまだありません</div>
+        <div class="empty-hint">右上の「＋ 日程を追加」から始めましょう</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MEMO PAGE ══════════ -->
+<div class="page" id="page-memo">
+  <div class="page-inner">
+    <div class="memo-top-bar">
+      <div class="sec-heading">📝 メモ</div>
+      <button class="action-btn" onclick="openMemoModal(null)">＋ 追加</button>
+    </div>
+    <div id="memoList">
+      <div class="memo-empty">
+        <div class="memo-empty-icon">📄</div>
+        <div class="memo-empty-text">メモはまだありません</div>
+        <div class="memo-empty-hint">右上の「＋ 追加」から作成できます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PACKING PAGE ══════════ -->
+<div class="page" id="page-packing">
+  <div class="page-inner">
+    <div class="sec-heading">🧳 持ち物リスト</div>
+    <div class="pack-stats">
+      <div class="pack-stat">
+        <div class="pstat-num" id="pTotal">0</div>
+        <div class="pstat-lbl">総アイテム</div>
+      </div>
+      <div class="pack-stat">
+        <div class="pstat-num" id="pDone">0</div>
+        <div class="pstat-lbl">準備完了</div>
+      </div>
+      <div class="pack-stat">
+        <div class="pstat-num" id="pLeft">0</div>
+        <div class="pstat-lbl">残り</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span>優先度：</span>
+      <span class="legend-item"><span class="ldot" style="background:#E86B4E"></span>必須</span>
+      <span class="legend-item"><span class="ldot" style="background:#D4A017"></span>あると便利</span>
+    </div>
+    <div class="pack-toolbar">
+      <button class="pill active" id="pbAll"       onclick="packFilter('all')">すべて</button>
+      <button class="pill"        id="pbUnchecked"  onclick="packFilter('unchecked')">未チェック</button>
+      <button class="pill"        id="pbChecked"    onclick="packFilter('checked')">完了</button>
+      <button class="pill"                          onclick="packReset()">リセット</button>
+    </div>
+    <div class="srch-wrap">
+      <span class="srch-icon">🔍</span>
+      <input type="text" placeholder="アイテムを検索…" oninput="packSearch(this.value)" autocomplete="off">
+    </div>
+    <div id="packContainer"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Day Modal -->
+<div class="modal-overlay" id="dayModal" onclick="overlayClose(event,'dayModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="dayModalTitle">日程を追加</h3>
+    <label class="form-label">ラベル（例：Day 1）</label>
+    <input class="form-input" id="dayLabel" placeholder="Day 1" autocomplete="off">
+    <label class="form-label">日付・サブタイトル</label>
+    <input class="form-input" id="dayDate" placeholder="例：6月10日（月）" autocomplete="off">
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="dayTitle" placeholder="例：ワイキキ散策" autocomplete="off">
+    <label class="form-label">宿泊ホテル</label>
+    <input class="form-input" id="dayHotel" placeholder="例：ヒルトン ハワイアン ビレッジ" autocomplete="off">
+    <label class="form-label">カラー</label>
+    <select class="form-select" id="dayColor">
+      <option value="#0A6880">🔵 ディープオーシャン</option>
+      <option value="#0D8FB5">🩵 オーシャンブルー</option>
+      <option value="#3A7D44">🟢 トロピカルグリーン</option>
+      <option value="#E86B4E">🪸 コーラル</option>
+      <option value="#6B5EA8">🟣 サンセットパープル</option>
+      <option value="#C49A2A">🟡 サンゴールド</option>
+      <option value="#2D4A56">🌊 ダークネイビー</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeDayModal()">キャンセル</button>
+      <button id="dayDelBtn" class="btn-danger" onclick="deleteDay()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveDay()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Modal -->
+<div class="modal-overlay" id="evModal" onclick="overlayClose(event,'evModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="evModalTitle">イベントを追加</h3>
+    <label class="form-label">時間</label>
+    <input class="form-input" id="evTime" placeholder="例：09:00" autocomplete="off">
+    <label class="form-label">タイプ</label>
+    <select class="form-select" id="evType">
+      <option value="sight">🏛 観光</option>
+      <option value="food">🍽 食事</option>
+      <option value="beach">🏖 ビーチ</option>
+      <option value="activity">🏄 アクティビティ</option>
+      <option value="hotel">🏨 ホテル</option>
+      <option value="flight">✈️ フライト</option>
+    </select>
+    <label class="form-label">名前</label>
+    <input class="form-input" id="evName" placeholder="例：ダイヤモンドヘッド登山" autocomplete="off">
+    <label class="form-label">メモ（任意）</label>
+    <textarea class="form-textarea" id="evNote" placeholder="詳細・予約番号など"></textarea>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeEvModal()">キャンセル</button>
+      <button id="evDelBtn" class="btn-danger" onclick="deleteEv()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveEv()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memo Modal -->
+<div class="modal-overlay" id="memoModal" onclick="overlayClose(event,'memoModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="memoModalTitle">メモを追加</h3>
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="memoTitleIn" placeholder="例：ホテルの予約情報" autocomplete="off">
+    <label class="form-label">内容</label>
+    <textarea class="form-textarea" id="memoBodyIn" placeholder="メモを入力…" style="height:130px"></textarea>
+    <label class="form-label">カラー</label>
+    <select class="form-select" id="memoColorIn">
+      <option value="ocean">🔵 ブルー（デフォルト）</option>
+      <option value="coral">🔴 コーラル</option>
+      <option value="leaf">🟢 グリーン</option>
+      <option value="sun">🟡 イエロー</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeMemoModal()">キャンセル</button>
+      <button id="memoDelBtn" class="btn-danger" onclick="deleteMemo()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveMemo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="cfwrap" id="cfwrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  DATA — PACKING (preset, user can delete items)
+// ══════════════════════════════════════════════════════
+const DEFAULT_PACK = [
+  {id:'docs',icon:'🛂',name:'書類・貴重品',items:[
+    {id:'d1',name:'パスポート',note:'有効期限6ヶ月以上確認',p:'high'},
+    {id:'d2',name:'ESTA（渡航認証）',note:'出発72時間前までに申請',p:'high'},
+    {id:'d3',name:'航空券（eチケット）',note:'プリントorスマホ保存',p:'high'},
+    {id:'d4',name:'ホテル予約確認書',note:'オフラインでも確認できるよう保存',p:'high'},
+    {id:'d5',name:'クレジットカード',note:'海外利用可能・複数枚推奨',p:'high'},
+    {id:'d6',name:'現金（USD）',note:'到着後両替またはATM利用',p:'high'},
+    {id:'d7',name:'海外旅行保険証書',note:'クレカ付帯の場合は条件確認',p:'high'},
+    {id:'d8',name:'国際免許証',note:'レンタカーを使う場合',p:'med'},
+    {id:'d9',name:'パスポートのコピー',note:'紛失時のため別に保管',p:'med'},
+  ]},
+  {id:'clothes',icon:'👕',name:'衣類',items:[
+    {id:'c1',name:'Tシャツ・半袖シャツ',note:'6〜7枚（リゾートカジュアル対応も）',p:'high'},
+    {id:'c2',name:'ショートパンツ',note:'3〜4枚',p:'high'},
+    {id:'c3',name:'水着',note:'2〜3枚（乾きにくい日に備えて複数）',p:'high'},
+    {id:'c4',name:'ラッシュガード',note:'日焼け対策・マリンアクティビティに',p:'high'},
+    {id:'c5',name:'カーディガン・薄手の羽織り',note:'室内冷房・夜の気温差対策',p:'high'},
+    {id:'c6',name:'下着・靴下',note:'8セット',p:'high'},
+    {id:'c7',name:'スニーカー・歩きやすいサンダル',note:'トレッキングはスニーカー必須',p:'high'},
+    {id:'c8',name:'ビーチサンダル',note:'',p:'high'},
+    {id:'c9',name:'スマートカジュアルな服',note:'レストランディナー用',p:'med'},
+    {id:'c10',name:'UVカット帽子',note:'日差しが強い',p:'high'},
+    {id:'c11',name:'サングラス',note:'',p:'high'},
+  ]},
+  {id:'beach',icon:'🏖️',name:'ビーチ・アクティビティ',items:[
+    {id:'b1',name:'日焼け止め（高SPF）',note:'SPF50+推奨・リーフセーフ製品が◎',p:'high'},
+    {id:'b2',name:'ビーチタオル',note:'ホテルにある場合も多い',p:'med'},
+    {id:'b3',name:'防水バッグ・ドライバッグ',note:'スマホ・財布の保護に',p:'med'},
+    {id:'b4',name:'シュノーケルセット',note:'レンタル可だが持参で節約',p:'med'},
+    {id:'b5',name:'水中カメラ・防水ケース',note:'',p:'med'},
+    {id:'b6',name:'虫除けスプレー',note:'山・ジャングルエリア向け',p:'med'},
+  ]},
+  {id:'tech',icon:'📱',name:'デジタル・ガジェット',items:[
+    {id:'t1',name:'スマートフォン + 充電器',note:'',p:'high'},
+    {id:'t2',name:'モバイルバッテリー',note:'10000mAh以上推奨',p:'high'},
+    {id:'t3',name:'SIMカード or 海外eSIM',note:'事前にアクティベート推奨',p:'high'},
+    {id:'t4',name:'カメラ',note:'バッテリー・メモリーカード確認',p:'med'},
+    {id:'t5',name:'ノイズキャンセリングイヤホン',note:'長距離フライト向け',p:'med'},
+    {id:'t6',name:'マルチ充電ケーブル',note:'Lightning / USB-C など',p:'med'},
+  ]},
+  {id:'health',icon:'💊',name:'衛生・医療品',items:[
+    {id:'h1',name:'常備薬',note:'胃腸薬・痛み止め・酔い止め',p:'high'},
+    {id:'h2',name:'処方薬',note:'十分な量＋英語の処方箋',p:'high'},
+    {id:'h3',name:'バンドエイド・救急セット',note:'',p:'med'},
+    {id:'h4',name:'歯ブラシ・歯磨き粉',note:'',p:'high'},
+    {id:'h5',name:'洗顔料・化粧品',note:'',p:'high'},
+    {id:'h6',name:'アフターサン（日焼けケア）',note:'',p:'med'},
+    {id:'h7',name:'除菌シート・ウェットティッシュ',note:'',p:'med'},
+  ]},
+  {id:'travel',icon:'🧳',name:'旅行用品',items:[
+    {id:'tr1',name:'スーツケース（機内預け）',note:'重量制限確認：通常23kg',p:'high'},
+    {id:'tr2',name:'キャリーバッグ（機内持ち込み）',note:'7〜10kg以内',p:'high'},
+    {id:'tr3',name:'ネックピロー',note:'機内での長時間フライトに',p:'med'},
+    {id:'tr4',name:'アイマスク・耳栓',note:'機内・ホテルでの快適睡眠に',p:'med'},
+    {id:'tr5',name:'ジップロック・圧縮袋',note:'液体物・水着の整理に',p:'med'},
+    {id:'tr6',name:'折りたたみエコバッグ',note:'お土産・ショッピング用',p:'low'},
+    {id:'tr7',name:'筆記用具',note:'入国カード記入に',p:'med'},
+  ]},
+  {id:'misc',icon:'✨',name:'その他',items:[
+    {id:'m1',name:'Google マップ・オフライン地図保存',note:'事前にダウンロードしておく',p:'high'},
+    {id:'m2',name:'Uber / Lyft アプリ設定',note:'ハワイはタクシーより便利',p:'high'},
+    {id:'m3',name:'旅行ガイドブック',note:'',p:'low'},
+    {id:'m4',name:'日本のお菓子（保険食）',note:'',p:'low'},
+    {id:'m5',name:'洗濯ネット',note:'長期滞在時のコインランドリー用',p:'low'},
+  ]},
+];
+
+// ══════════════════════════════════════════════════════
+//  STATE & PERSISTENCE
+// ══════════════════════════════════════════════════════
+const SK = 'hawaii_planner_v4';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(SK) || 'null'); } catch { return null; }
+}
+function saveState() {
+  try { localStorage.setItem(SK, JSON.stringify(S)); } catch {}
+}
+
+let saved = loadState();
+let S = saved || {
+  days:  [],        // itinerary days
+  memos: [],        // memo notes
+  packChecked: {},  // { itemId: true }
+  packDeleted: {},  // { itemId: true }
+};
+if (!S.days)        S.days = [];
+if (!S.memos)       S.memos = [];
+if (!S.packChecked) S.packChecked = {};
+if (!S.packDeleted) S.packDeleted = {};
+
+// ══════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════
+//  ITINERARY
+// ══════════════════════════════════════════════════════
+const TYPE_META = {
+  flight:   { lbl: 'フライト',       bc: 'b-flight',   dc: 't-flight' },
+  food:     { lbl: '食事',           bc: 'b-food',     dc: 't-food' },
+  sight:    { lbl: '観光',           bc: 'b-sight',    dc: 't-sight' },
+  hotel:    { lbl: 'ホテル',         bc: 'b-hotel',    dc: 't-hotel' },
+  beach:    { lbl: 'ビーチ',         bc: 'b-beach',    dc: 't-beach' },
+  activity: { lbl: 'アクティビティ', bc: 'b-activity',  dc: 't-activity' },
+};
+
+let editDayId = null;
+let editEvId  = null;
+let editEvDayId = null;
+
+function renderItn() {
+  const c = document.getElementById('itnContainer');
+  if (!S.days.length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🗓️</div>
+      <div class="empty-text">旅程がまだありません</div>
+      <div class="empty-hint">右上の「＋ 日程を追加」から始めましょう</div>
+    </div>`;
+    return;
+  }
+  c.innerHTML = S.days.map(day => `
+    <div class="day-card" id="dc_${day.id}">
+      <div class="day-hdr" style="background:${day.color || '#0A6880'}">
+        <div class="day-num">${(day.label || '').replace(/Day\s*/i, '')}</div>
+        <div class="day-info" onclick="toggleTimeline('tl_${day.id}','chev_${day.id}')">
+          <div class="day-label">${day.label || ''} · ${day.date || ''}</div>
+          <div class="day-date-text">${day.title || ''}</div>
+          ${day.hotel ? `<div class="day-hotel-badge">🏨 ${day.hotel}</div>` : ''}
+        </div>
+        <div class="day-hdr-actions">
+          <button class="icon-btn" title="日程を編集" onclick="openDayModal('${day.id}')">✏️</button>
+          <button class="icon-btn" title="開閉" onclick="toggleTimeline('tl_${day.id}','chev_${day.id}')">
+            <span class="day-chev" id="chev_${day.id}">▼</span>
+          </button>
+        </div>
+      </div>
+      <div class="timeline" id="tl_${day.id}">
+        ${day.events && day.events.length
+          ? day.events.map(ev => renderEvRow(ev, day.id)).join('')
+          : `<div style="padding:14px 0;font-size:14px;color:var(--mid);text-align:center;">イベントがまだありません</div>`
+        }
+        <div class="tl-add-wrap">
+          <button class="tl-add-btn" onclick="openEvModal('${day.id}', null)">＋ イベントを追加</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderEvRow(ev, dayId) {
+  const m = TYPE_META[ev.type] || TYPE_META.sight;
+  return `
+    <div class="tl-row">
+      <div class="tl-time-col"><div class="tl-time">${ev.time || ''}</div></div>
+      <div class="tl-dot-wrap"><div class="tl-dot ${m.dc}"></div></div>
+      <div class="tl-body">
+        <span class="tl-badge ${m.bc}">${m.lbl}</span>
+        <div class="tl-name">${ev.name || ''}</div>
+        ${ev.note ? `<div class="tl-note">${ev.note}</div>` : ''}
+      </div>
+      <button class="tl-edit-btn" onclick="openEvModal('${dayId}','${ev.id}')">✏️</button>
+    </div>`;
+}
+
+function toggleTimeline(tlId, chevId) {
+  const tl   = document.getElementById(tlId);
+  const chev = document.getElementById(chevId);
+  if (!tl) return;
+  const isOpen = tl.classList.contains('open');
+  tl.classList.toggle('open', !isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+
+/* ── Day Modal ── */
+function openDayModal(dayId) {
+  editDayId = dayId;
+  if (dayId) {
+    const day = S.days.find(d => d.id === dayId);
+    document.getElementById('dayModalTitle').textContent = '日程を編集';
+    document.getElementById('dayLabel').value  = day.label  || '';
+    document.getElementById('dayDate').value   = day.date   || '';
+    document.getElementById('dayTitle').value  = day.title  || '';
+    document.getElementById('dayHotel').value  = day.hotel  || '';
+    document.getElementById('dayColor').value  = day.color  || '#0A6880';
+    document.getElementById('dayDelBtn').style.display = '';
+  } else {
+    document.getElementById('dayModalTitle').textContent = '日程を追加';
+    document.getElementById('dayLabel').value  = '';
+    document.getElementById('dayDate').value   = '';
+    document.getElementById('dayTitle').value  = '';
+    document.getElementById('dayHotel').value  = '';
+    document.getElementById('dayColor').value  = '#0A6880';
+    document.getElementById('dayDelBtn').style.display = 'none';
+  }
+  document.getElementById('dayModal').classList.add('open');
+}
+function closeDayModal() { document.getElementById('dayModal').classList.remove('open'); }
+function saveDay() {
+  const label = document.getElementById('dayLabel').value.trim();
+  if (!label) { alert('ラベルを入力してください'); return; }
+  if (editDayId) {
+    const day = S.days.find(d => d.id === editDayId);
+    day.label  = label;
+    day.date   = document.getElementById('dayDate').value.trim();
+    day.title  = document.getElementById('dayTitle').value.trim();
+    day.hotel  = document.getElementById('dayHotel').value.trim();
+    day.color  = document.getElementById('dayColor').value;
+  } else {
+    S.days.push({
+      id:     'day_' + Date.now(),
+      label,
+      date:   document.getElementById('dayDate').value.trim(),
+      title:  document.getElementById('dayTitle').value.trim(),
+      hotel:  document.getElementById('dayHotel').value.trim(),
+      color:  document.getElementById('dayColor').value,
+      events: [],
+    });
+  }
+  saveState(); renderItn(); closeDayModal();
+}
+function deleteDay() {
+  if (!confirm(`「${S.days.find(d=>d.id===editDayId)?.label}」を削除しますか？`)) return;
+  S.days = S.days.filter(d => d.id !== editDayId);
+  saveState(); renderItn(); closeDayModal();
+}
+
+/* ── Event Modal ── */
+function openEvModal(dayId, evId) {
+  editEvDayId = dayId;
+  editEvId    = evId;
+  if (evId) {
+    const day = S.days.find(d => d.id === dayId);
+    const ev  = day.events.find(e => e.id === evId);
+    document.getElementById('evModalTitle').textContent = 'イベントを編集';
+    document.getElementById('evTime').value = ev.time  || '';
+    document.getElementById('evType').value = ev.type  || 'sight';
+    document.getElementById('evName').value = ev.name  || '';
+    document.getElementById('evNote').value = ev.note  || '';
+    document.getElementById('evDelBtn').style.display = '';
+  } else {
+    document.getElementById('evModalTitle').textContent = 'イベントを追加';
+    document.getElementById('evTime').value = '';
+    document.getElementById('evType').value = 'sight';
+    document.getElementById('evName').value = '';
+    document.getElementById('evNote').value = '';
+    document.getElementById('evDelBtn').style.display = 'none';
+  }
+  document.getElementById('evModal').classList.add('open');
+}
+function closeEvModal() { document.getElementById('evModal').classList.remove('open'); }
+function saveEv() {
+  const name = document.getElementById('evName').value.trim();
+  if (!name) { alert('名前を入力してください'); return; }
+  const day = S.days.find(d => d.id === editEvDayId);
+  const ev = {
+    id:   editEvId || 'ev_' + Date.now(),
+    time: document.getElementById('evTime').value.trim(),
+    type: document.getElementById('evType').value,
+    name,
+    note: document.getElementById('evNote').value.trim(),
+  };
+  if (editEvId) {
+    const idx = day.events.findIndex(e => e.id === editEvId);
+    day.events[idx] = ev;
+  } else {
+    day.events.push(ev);
+    day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  }
+  saveState(); renderItn(); closeEvModal();
+  // re-open timeline
+  setTimeout(() => {
+    const tl = document.getElementById('tl_' + editEvDayId);
+    const chev = document.getElementById('chev_' + editEvDayId);
+    if (tl && !tl.classList.contains('open')) {
+      tl.classList.add('open');
+      if (chev) chev.classList.add('open');
+    }
+  }, 50);
+}
+function deleteEv() {
+  const day = S.days.find(d => d.id === editEvDayId);
+  if (!confirm(`「${day.events.find(e=>e.id===editEvId)?.name}」を削除しますか？`)) return;
+  day.events = day.events.filter(e => e.id !== editEvId);
+  saveState(); renderItn(); closeEvModal();
+}
+
+// ══════════════════════════════════════════════════════
+//  MEMO
+// ══════════════════════════════════════════════════════
+let editMemoId = null;
+const MEMO_COLOR_MAP = { ocean: '', coral: ' c-coral', leaf: ' c-leaf', sun: ' c-sun' };
+
+function renderMemos() {
+  const l = document.getElementById('memoList');
+  if (!S.memos.length) {
+    l.innerHTML = `<div class="memo-empty">
+      <div class="memo-empty-icon">📄</div>
+      <div class="memo-empty-text">メモはまだありません</div>
+      <div class="memo-empty-hint">右上の「＋ 追加」から作成できます</div>
+    </div>`;
+    return;
+  }
+  l.innerHTML = S.memos.map(m => `
+    <div class="memo-card${MEMO_COLOR_MAP[m.color] || ''}" onclick="openMemoModal('${m.id}')">
+      <div class="memo-card-title">${m.title || '（無題）'}</div>
+      <div class="memo-card-body">${m.body || ''}</div>
+      <div class="memo-card-meta">${new Date(m.updatedAt).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+  `).join('');
+}
+
+function openMemoModal(id) {
+  editMemoId = id || null;
+  if (id) {
+    const m = S.memos.find(x => x.id === id);
+    document.getElementById('memoModalTitle').textContent = 'メモを編集';
+    document.getElementById('memoTitleIn').value   = m.title || '';
+    document.getElementById('memoBodyIn').value    = m.body  || '';
+    document.getElementById('memoColorIn').value   = m.color || 'ocean';
+    document.getElementById('memoDelBtn').style.display = '';
+  } else {
+    document.getElementById('memoModalTitle').textContent = 'メモを追加';
+    document.getElementById('memoTitleIn').value   = '';
+    document.getElementById('memoBodyIn').value    = '';
+    document.getElementById('memoColorIn').value   = 'ocean';
+    document.getElementById('memoDelBtn').style.display = 'none';
+  }
+  document.getElementById('memoModal').classList.add('open');
+}
+function closeMemoModal() { document.getElementById('memoModal').classList.remove('open'); }
+function saveMemo() {
+  const title = document.getElementById('memoTitleIn').value.trim();
+  const body  = document.getElementById('memoBodyIn').value.trim();
+  if (!title && !body) return;
+  const now = Date.now();
+  if (editMemoId) {
+    const m = S.memos.find(x => x.id === editMemoId);
+    m.title = title; m.body = body; m.color = document.getElementById('memoColorIn').value; m.updatedAt = now;
+  } else {
+    S.memos.unshift({ id: 'm_' + now, title, body, color: document.getElementById('memoColorIn').value, updatedAt: now });
+  }
+  saveState(); renderMemos(); closeMemoModal();
+}
+function deleteMemo() {
+  if (!confirm('このメモを削除しますか？')) return;
+  S.memos = S.memos.filter(x => x.id !== editMemoId);
+  saveState(); renderMemos(); closeMemoModal();
+}
+
+// ══════════════════════════════════════════════════════
+//  PACKING
+// ══════════════════════════════════════════════════════
+let packFlt = 'all';
+let packQ   = '';
+
+function packFilter(f) {
+  packFlt = f;
+  ['All', 'Unchecked', 'Checked'].forEach(x => {
+    document.getElementById('pb' + x).classList.toggle('active', f === x.toLowerCase());
+  });
+  renderPack();
+}
+function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
+function packReset() {
+  if (!confirm('すべてのチェックをリセットしますか？')) return;
+  S.packChecked = {};
+  saveState(); renderPack();
+}
+function togglePack(itemId) {
+  S.packChecked[itemId] = !S.packChecked[itemId];
+  saveState(); renderPack();
+  if (S.packChecked[itemId]) confetti();
+}
+function deletePackItem(itemId, e) {
+  e.stopPropagation();
+  if (!confirm('このアイテムを削除しますか？')) return;
+  S.packDeleted[itemId] = true;
+  delete S.packChecked[itemId];
+  saveState(); renderPack();
+}
+
+function renderPack() {
+  const c = document.getElementById('packContainer');
+  c.innerHTML = '';
+  let total = 0, done = 0;
+
+  DEFAULT_PACK.forEach(sec => {
+    const activeItems = sec.items.filter(item => !S.packDeleted[item.id]);
+    let secDone = 0;
+
+    const rows = activeItems.map(item => {
+      const chk = !!S.packChecked[item.id];
+      total++; if (chk) { done++; secDone++; }
+      const matchQ = !packQ || item.name.toLowerCase().includes(packQ) || (item.note || '').toLowerCase().includes(packQ);
+      const matchF = packFlt === 'all'
+        || (packFlt === 'checked'   && chk)
+        || (packFlt === 'unchecked' && !chk);
+      return { item, chk, vis: matchQ && matchF };
+    });
+
+    if (!rows.some(r => r.vis)) return;
+
+    const allDone  = activeItems.length > 0 && secDone === activeItems.length;
+    const wrap = document.createElement('div');
+    wrap.className = 'psec';
+    wrap.innerHTML = `
+      <div class="psec-hdr" onclick="togglePSec('pl_${sec.id}', this)">
+        <span class="psec-icon">${sec.icon}</span>
+        <span class="psec-name">${sec.name}</span>
+        <span class="psec-count${allDone ? ' all-done' : ''}">${secDone}/${activeItems.length}</span>
+        <span class="psec-chev open">▼</span>
+      </div>
+      <div class="pitems-list" id="pl_${sec.id}">
+        ${rows.map(({ item, chk, vis }) => `
+          <div class="pitem${chk ? ' checked' : ''}${!vis ? ' hidden' : ''}"
+               onclick="togglePack('${item.id}')">
+            <span class="pdot ${item.p || 'low'}"></span>
+            <div class="pchk"><span class="ptick">✓</span></div>
+            <div class="pbody">
+              <div class="pname">${item.name}</div>
+              ${item.note ? `<div class="pnote">${item.note}</div>` : ''}
+            </div>
+            <button class="pdel-btn" onclick="deletePackItem('${item.id}', event)" title="削除">✕</button>
+          </div>
+        `).join('')}
+      </div>`;
+    c.appendChild(wrap);
+  });
+
+  document.getElementById('pTotal').textContent = total;
+  document.getElementById('pDone').textContent  = done;
+  document.getElementById('pLeft').textContent  = total - done;
+
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('heroBar').style.width = pct + '%';
+  document.getElementById('heroLbl').textContent = `持ち物 ${done} / ${total} 準備完了`;
+}
+
+function togglePSec(listId, hdr) {
+  const list = document.getElementById(listId);
+  const chev = hdr.querySelector('.psec-chev');
+  const open = list.style.display !== 'none' && list.style.display !== '';
+  // pitems-list defaults to block (open). We toggle it.
+  list.style.display = open ? 'none' : '';
+  hdr.classList.toggle('collapsed', open);
+  chev.classList.toggle('open', !open);
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL HELPERS
+// ══════════════════════════════════════════════════════
+function overlayClose(e, id) {
+  if (e.target === e.currentTarget) document.getElementById(id).classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════
+//  CONFETTI
+// ══════════════════════════════════════════════════════
+function confetti() {
+  const w = document.getElementById('cfwrap');
+  const cols = ['#0A6880','#E86B4E','#D4A017','#3A7D44','#1597B8'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'cfp';
+    el.style.cssText = `
+      left: ${Math.random() * 100}%;
+      top: -12px;
+      background: ${cols[Math.floor(Math.random() * cols.length)]};
+      animation-duration: ${0.9 + Math.random() * 0.9}s;
+      animation-delay: ${Math.random() * 0.3}s;
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    w.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+renderItn();
+renderMemos();
+renderPack();
+</script>
+</body>
+</html>
