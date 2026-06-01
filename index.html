@@ -1335,7 +1335,7 @@ async function togglePack(itemId) {
   await saveState(); renderPack();
   if (S.packChecked[itemId]) confetti();
 }
-function deletePackItem(itemId, e) {
+async function deletePackItem(itemId, e) {
   e.stopPropagation();
   if (!confirm('このアイテムを削除しますか？')) return;
   S.packDeleted[itemId] = true;
@@ -1438,6 +1438,24 @@ function confetti() {
     setTimeout(() => el.remove(), 2200);
   }
 }
+
+supabaseClient
+  .channel('trip_plans')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'trip_plans'
+    },
+    async () => {
+      S = await loadState();
+      renderItn();
+      renderMemos();
+      renderPack();
+    }
+  )
+  .subscribe();
 
 // ══════════════════════════════════════════════════════
 //  INIT
