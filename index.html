@@ -1180,12 +1180,12 @@ async function saveDay() {
       events: [],
     });
   }
-  await await saveState(); renderItn(); closeDayModal();
+  await saveState(); renderItn(); closeDayModal();
 }
-function deleteDay() {
+async function deleteDay() {
   if (!confirm(`「${S.days.find(d=>d.id===editDayId)?.label}」を削除しますか？`)) return;
   S.days = S.days.filter(d => d.id !== editDayId);
-  await await saveState(); renderItn(); closeDayModal();
+  await saveState(); renderItn(); closeDayModal();
 }
 
 /* ── Event Modal ── */
@@ -1212,7 +1212,7 @@ function openEvModal(dayId, evId) {
   document.getElementById('evModal').classList.add('open');
 }
 function closeEvModal() { document.getElementById('evModal').classList.remove('open'); }
-function saveEv() {
+async function saveEv() {
   const name = document.getElementById('evName').value.trim();
   if (!name) { alert('名前を入力してください'); return; }
   const day = S.days.find(d => d.id === editEvDayId);
@@ -1230,7 +1230,7 @@ function saveEv() {
     day.events.push(ev);
     day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }
-  await await saveState(); renderItn(); closeEvModal();
+  await saveState(); renderItn(); closeEvModal();
   // re-open timeline
   setTimeout(() => {
     const tl = document.getElementById('tl_' + editEvDayId);
@@ -1241,11 +1241,11 @@ function saveEv() {
     }
   }, 50);
 }
-function deleteEv() {
+async function deleteEv() {
   const day = S.days.find(d => d.id === editEvDayId);
   if (!confirm(`「${day.events.find(e=>e.id===editEvId)?.name}」を削除しますか？`)) return;
   day.events = day.events.filter(e => e.id !== editEvId);
-  await await saveState(); renderItn(); closeEvModal();
+  await saveState(); renderItn(); closeEvModal();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1292,7 +1292,7 @@ function openMemoModal(id) {
   document.getElementById('memoModal').classList.add('open');
 }
 function closeMemoModal() { document.getElementById('memoModal').classList.remove('open'); }
-function saveMemo() {
+async function saveMemo() {
   const title = document.getElementById('memoTitleIn').value.trim();
   const body  = document.getElementById('memoBodyIn').value.trim();
   if (!title && !body) return;
@@ -1303,12 +1303,12 @@ function saveMemo() {
   } else {
     S.memos.unshift({ id: 'm_' + now, title, body, color: document.getElementById('memoColorIn').value, updatedAt: now });
   }
-  await await saveState(); renderMemos(); closeMemoModal();
+  await saveState(); renderMemos(); closeMemoModal();
 }
-function deleteMemo() {
+async function deleteMemo() {
   if (!confirm('このメモを削除しますか？')) return;
   S.memos = S.memos.filter(x => x.id !== editMemoId);
-  await await saveState(); renderMemos(); closeMemoModal();
+  await saveState(); renderMemos(); closeMemoModal();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1325,14 +1325,14 @@ function packFilter(f) {
   renderPack();
 }
 function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
-function packReset() {
+async function packReset() {
   if (!confirm('すべてのチェックをリセットしますか？')) return;
   S.packChecked = {};
-  await await saveState(); renderPack();
+  await saveState(); renderPack();
 }
-function togglePack(itemId) {
+async function togglePack(itemId) {
   S.packChecked[itemId] = !S.packChecked[itemId];
-  await await saveState(); renderPack();
+  await saveState(); renderPack();
   if (S.packChecked[itemId]) confetti();
 }
 function deletePackItem(itemId, e) {
