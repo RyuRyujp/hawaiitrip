@@ -915,7 +915,19 @@ body {
 
 <div class="cfwrap" id="cfwrap"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaml5cnFmeGpkbW1naHV3emV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTUwNDcsImV4cCI6MjA5NTg5MTA0N30.FHEATyLy8iyaUrzOtwBUD4PUo82PMlPX-H9qk2Hwguw";
+  
+  const supabaseClient = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+  
+  const shareCode =
+    new URLSearchParams(location.search).get("trip") ||
+    "default";
 // ══════════════════════════════════════════════════════
 //  DATA — PACKING (preset, user can delete items)
 // ══════════════════════════════════════════════════════
@@ -992,19 +1004,42 @@ const DEFAULT_PACK = [
 // ══════════════════════════════════════════════════════
 const SK = 'hawaii_planner_v4';
 
-function loadState() {
-  try { return JSON.parse(localStorage.getItem(SK) || 'null'); } catch { return null; }
-}
-function saveState() {
-  try { localStorage.setItem(SK, JSON.stringify(S)); } catch {}
+async function loadState() {
+
+  const { data, error } = await supabaseClient
+    .from("trip_plans")
+    .select("data")
+    .eq("share_code", shareCode)
+    .single();
+
+  if (error || !data) {
+    return {
+      days: [],
+      memos: [],
+      packChecked: {},
+      packDeleted: {}
+    };
+  }
+
+  return data.data;
 }
 
-let saved = loadState();
-let S = saved || {
-  days:  [],        // itinerary days
-  memos: [],        // memo notes
-  packChecked: {},  // { itemId: true }
-  packDeleted: {},  // { itemId: true }
+async function saveState() {
+
+  await supabaseClient
+    .from("trip_plans")
+    .upsert({
+      share_code: shareCode,
+      data: S,
+      updated_at: new Date().toISOString()
+    });
+}
+
+let S = {
+  days: [],
+  memos: [],
+  packChecked: {},
+  packDeleted: {}
 };
 if (!S.days)        S.days = [];
 if (!S.memos)       S.memos = [];
@@ -1124,7 +1159,7 @@ function openDayModal(dayId) {
   document.getElementById('dayModal').classList.add('open');
 }
 function closeDayModal() { document.getElementById('dayModal').classList.remove('open'); }
-function saveDay() {
+async function saveDay() {
   const label = document.getElementById('dayLabel').value.trim();
   if (!label) { alert('ラベルを入力してください'); return; }
   if (editDayId) {
@@ -1145,12 +1180,12 @@ function saveDay() {
       events: [],
     });
   }
-  saveState(); renderItn(); closeDayModal();
+  await await saveState(); renderItn(); closeDayModal();
 }
 function deleteDay() {
   if (!confirm(`「${S.days.find(d=>d.id===editDayId)?.label}」を削除しますか？`)) return;
   S.days = S.days.filter(d => d.id !== editDayId);
-  saveState(); renderItn(); closeDayModal();
+  await await saveState(); renderItn(); closeDayModal();
 }
 
 /* ── Event Modal ── */
@@ -1195,7 +1230,7 @@ function saveEv() {
     day.events.push(ev);
     day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }
-  saveState(); renderItn(); closeEvModal();
+  await await saveState(); renderItn(); closeEvModal();
   // re-open timeline
   setTimeout(() => {
     const tl = document.getElementById('tl_' + editEvDayId);
@@ -1210,7 +1245,7 @@ function deleteEv() {
   const day = S.days.find(d => d.id === editEvDayId);
   if (!confirm(`「${day.events.find(e=>e.id===editEvId)?.name}」を削除しますか？`)) return;
   day.events = day.events.filter(e => e.id !== editEvId);
-  saveState(); renderItn(); closeEvModal();
+  await await saveState(); renderItn(); closeEvModal();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1268,12 +1303,12 @@ function saveMemo() {
   } else {
     S.memos.unshift({ id: 'm_' + now, title, body, color: document.getElementById('memoColorIn').value, updatedAt: now });
   }
-  saveState(); renderMemos(); closeMemoModal();
+  await await saveState(); renderMemos(); closeMemoModal();
 }
 function deleteMemo() {
   if (!confirm('このメモを削除しますか？')) return;
   S.memos = S.memos.filter(x => x.id !== editMemoId);
-  saveState(); renderMemos(); closeMemoModal();
+  await await saveState(); renderMemos(); closeMemoModal();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1293,11 +1328,11 @@ function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
 function packReset() {
   if (!confirm('すべてのチェックをリセットしますか？')) return;
   S.packChecked = {};
-  saveState(); renderPack();
+  await await saveState(); renderPack();
 }
 function togglePack(itemId) {
   S.packChecked[itemId] = !S.packChecked[itemId];
-  saveState(); renderPack();
+  await await saveState(); renderPack();
   if (S.packChecked[itemId]) confetti();
 }
 function deletePackItem(itemId, e) {
@@ -1305,7 +1340,7 @@ function deletePackItem(itemId, e) {
   if (!confirm('このアイテムを削除しますか？')) return;
   S.packDeleted[itemId] = true;
   delete S.packChecked[itemId];
-  saveState(); renderPack();
+  await saveState(); renderPack();
 }
 
 function renderPack() {
@@ -1407,9 +1442,12 @@ function confetti() {
 // ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
-renderItn();
-renderMemos();
-renderPack();
+(async () => {
+  S = await loadState();
+  renderItn();
+  renderMemos();
+  renderPack();
+})();
 </script>
 </body>
 </html>
