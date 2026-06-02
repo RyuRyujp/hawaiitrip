@@ -1,56 +1,2417 @@
-// api/ai.js  — Vercel Serverless Function
-// Anthropic APIキーをサーバー側で管理し、クライアントに露出させない
-//
-// 使い方：
-// 1. Vercel Dashboard > Settings > Environment Variables に
-//    ANTHROPIC_API_KEY を追加する
-// 2. このファイルをプロジェクトの /api/ai.js に置く
-// 3. hawaii_planner.html と同じリポジトリにデプロイする
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🌺 Hawaii Trip Planner</title>
+<style>
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-export default async function handler(req, res) {
-  // POST のみ許可
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+:root {
+  --ocean: #0A6880;
+  --ocean2: #1597B8;
+  --sand: #F5EDD8;
+  --coral: #E86B4E;
+  --leaf: #3A7D44;
+  --sun: #D4A017;
+  --dark: #162830;
+  --mid: #4A6572;
+  --light: #ffffff;
+  --sky: #EAF7FB;
+  --sky2: #D0ECF5;
+  --border: #C8E3EE;
+  --r: 14px;
+  --shadow: 0 2px 16px rgba(10,104,128,.10);
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  background: var(--sky);
+  color: var(--dark);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── LOADING OVERLAY ─── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--sky);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity .4s ease;
+}
+.loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--sky2);
+  border-top-color: var(--ocean);
+  border-radius: 50%;
+  animation: spin-load .8s linear infinite;
+}
+@keyframes spin-load { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 15px;
+  color: var(--mid);
+}
+
+/* ─── HERO ─── */
+.hero {
+  position: relative;
+  background: linear-gradient(155deg, #0A5870 0%, #0D8FB5 55%, #1AADDA 100%);
+  color: #fff;
+  padding: 48px 20px 96px;
+  text-align: center;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 65% 55% at 50% 0%, rgba(26,173,218,.4) 0%, transparent 70%);
+}
+.sun-spin {
+  position: absolute;
+  top: 14px; right: 18px;
+  font-size: 54px;
+  opacity: .13;
+  animation: spin 24s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hero-eyebrow {
+  font-size: 11px;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.55);
+  margin-bottom: 10px;
+  position: relative;
+}
+.hero-title {
+  font-size: clamp(36px, 8vw, 58px);
+  font-weight: 700;
+  letter-spacing: .5px;
+  line-height: 1.05;
+  position: relative;
+}
+.hero-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,.62);
+  margin-top: 8px;
+  position: relative;
+}
+.hero-progress-wrap {
+  max-width: 300px;
+  margin: 18px auto 0;
+  position: relative;
+}
+.hero-progress-track {
+  height: 5px;
+  background: rgba(255,255,255,.2);
+  border-radius: 3px;
+}
+.hero-progress-bar {
+  height: 100%;
+  background: #fff;
+  border-radius: 3px;
+  transition: width .5s ease;
+  width: 0%;
+}
+.hero-progress-label {
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+  margin-top: 7px;
+  text-align: center;
+}
+.hero-wave {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  line-height: 0;
+}
+.hero-wave svg { display: block; width: 100%; }
+
+/* ─── SYNC INDICATOR ─── */
+.sync-indicator {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ocean);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 100px;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.sync-indicator.visible { opacity: 1; }
+.sync-indicator.error { background: var(--coral); }
+
+/* ─── TAB BAR ─── */
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--light);
+  border-bottom: 2px solid var(--sky2);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: 13px 8px 11px;
+  border: none;
+  background: transparent;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 13px;
+  color: var(--mid);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all .2s;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn .tab-icon { font-size: 20px; }
+.tab-btn.active { color: var(--ocean); border-bottom-color: var(--ocean); font-weight: 600; }
+.tab-btn:hover:not(.active) { background: var(--sky); color: var(--dark); }
+
+/* ─── PAGES ─── */
+.page { display: none; animation: fadeUp .28s ease both; }
+.page.active { display: block; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.page-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+/* ─── SECTION HEADING ─── */
+.sec-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ocean);
+  margin-bottom: 18px;
+}
+
+/* ─── ACTION BUTTON ─── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: var(--ocean);
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.action-btn:hover { background: var(--ocean2); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── DAY CARDS ─── */
+.day-card {
+  margin-bottom: 16px;
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: var(--light);
+}
+.day-hdr {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.day-num {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: .75;
+  min-width: 44px;
+}
+.day-info { flex: 1; min-width: 0; }
+.day-label { font-size: 15px; font-weight: 700; }
+.day-date-text { font-size: 12px; color: rgba(255,255,255,.62); margin-top: 1px; }
+.day-hotel-badge {
+  font-size: 11px;
+  background: rgba(255,255,255,.2);
+  border-radius: 100px;
+  padding: 3px 10px;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.day-hdr-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,.18);
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { background: rgba(255,255,255,.3); }
+.day-chev {
+  font-size: 12px;
+  opacity: .65;
+  transition: transform .25s;
+  flex-shrink: 0;
+}
+.day-chev.open { transform: rotate(180deg); }
+
+/* ─── TIMELINE ─── */
+.timeline {
+  padding: 8px 18px 16px;
+  display: none;
+}
+.timeline.open { display: block; }
+.tl-row {
+  display: flex;
+  gap: 12px;
+  padding: 9px 0;
+  position: relative;
+}
+.tl-row:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 67px;
+  top: 34px;
+  bottom: -9px;
+  width: 2px;
+  background: var(--sky2);
+}
+.tl-time-col {
+  width: 46px;
+  text-align: right;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+.tl-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ocean2);
+  line-height: 1;
+}
+.tl-dot-wrap {
+  width: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+}
+.tl-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--light);
+  box-shadow: 0 0 0 2px var(--ocean);
+  background: var(--ocean);
+}
+.tl-dot.t-flight  { background: var(--dark);  box-shadow: 0 0 0 2px var(--dark); }
+.tl-dot.t-food    { background: var(--coral); box-shadow: 0 0 0 2px var(--coral); }
+.tl-dot.t-sight   { background: var(--leaf);  box-shadow: 0 0 0 2px var(--leaf); }
+.tl-dot.t-hotel   { background: var(--sun);   box-shadow: 0 0 0 2px var(--sun); }
+.tl-dot.t-beach   { background: var(--ocean2);box-shadow: 0 0 0 2px var(--ocean2); }
+.tl-dot.t-activity{ background: #7B5EA8;      box-shadow: 0 0 0 2px #7B5EA8; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-badge {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: .4px;
+  border-radius: 100px;
+  padding: 2px 8px;
+  margin-bottom: 2px;
+}
+.b-flight   { background: #e8ecef; color: var(--dark); }
+.b-food     { background: #fdecea; color: var(--coral); }
+.b-sight    { background: #e6f3e8; color: var(--leaf); }
+.b-hotel    { background: #fdf8e6; color: #7a5e00; }
+.b-beach    { background: #e0f3f9; color: var(--ocean); }
+.b-activity { background: #f0eafa; color: #6b3fa0; }
+.tl-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dark);
+}
+.tl-note {
+  font-size: 13px;
+  color: var(--mid);
+  margin-top: 3px;
+  line-height: 1.55;
+}
+.tl-addr {
+  font-size: 11px;
+  color: var(--mid);
+  margin-top: 4px;
+}
+.tl-links {
+  display: flex;
+  gap: 7px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.tl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ocean2);
+  text-decoration: none;
+  background: var(--sky);
+  padding: 3px 9px;
+  border-radius: 100px;
+  transition: background .15s;
+}
+.tl-link:hover { background: var(--sky2); }
+.tl-edit-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background .15s;
+  margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl-edit-btn:hover { background: var(--sky); }
+
+.tl-add-wrap {
+  border-top: 1px dashed var(--sky2);
+  margin-top: 6px;
+  padding-top: 2px;
+}
+.tl-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  color: var(--ocean2);
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl-add-btn:hover { color: var(--ocean); }
+
+/* ─── ITINERARY TOP BAR ─── */
+.itn-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* ─── MEMO ─── */
+.memo-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.memo-card {
+  background: var(--light);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--ocean);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.memo-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(10,104,128,.13); }
+.memo-card.c-coral { border-left-color: var(--coral); }
+.memo-card.c-leaf  { border-left-color: var(--leaf); }
+.memo-card.c-sun   { border-left-color: var(--sun); }
+.memo-card-title { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
+.memo-card-body  { font-size: 14px; color: var(--mid); line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.memo-card-meta  { font-size: 11px; color: #aac0c8; margin-top: 10px; }
+.memo-empty {
+  text-align: center;
+  padding: 56px 20px;
+  color: var(--mid);
+}
+.memo-empty-icon { font-size: 48px; opacity: .3; margin-bottom: 14px; }
+.memo-empty-text { font-size: 15px; }
+.memo-empty-hint { font-size: 13px; color: #aac0c8; margin-top: 6px; }
+
+/* ─── PACKING ─── */
+.pack-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.pack-stat {
+  flex: 1;
+  min-width: 72px;
+  background: var(--light);
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.pstat-num {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ocean);
+  line-height: 1;
+}
+.pstat-lbl { font-size: 11px; color: var(--mid); margin-top: 4px; }
+
+.pack-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 13px;
+  padding: 8px 15px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: var(--light);
+  color: var(--mid);
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pill:hover { border-color: var(--ocean2); color: var(--ocean); }
+.pill.active { background: var(--ocean); border-color: var(--ocean); color: #fff; }
+
+.srch-wrap { position: relative; margin-bottom: 16px; }
+.srch-wrap input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--light);
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--dark);
+  outline: none;
+  transition: border-color .2s;
+}
+.srch-wrap input:focus { border-color: var(--ocean2); }
+.srch-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--mid); pointer-events: none; }
+
+.legend {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--mid);
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.ldot { width: 8px; height: 8px; border-radius: 50%; }
+
+.psec { margin-bottom: 14px; }
+.psec-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  background: var(--light);
+  border: 1.5px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.psec-hdr:hover { background: var(--sky); }
+.psec-hdr.collapsed { border-radius: 14px; border-bottom-width: 1.5px; }
+.psec-icon { font-size: 20px; }
+.psec-name { font-size: 15px; font-weight: 600; flex: 1; }
+.psec-count {
+  font-size: 12px;
+  background: var(--sky);
+  color: var(--ocean);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+.psec-count.all-done { background: #e6f5e9; color: var(--leaf); }
+.psec-chev { font-size: 12px; color: var(--mid); transition: transform .25s; }
+.psec-chev.open { transform: rotate(180deg); }
+
+.pitems-list {
+  background: var(--light);
+  border: 1.5px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+.pitem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(10,104,128,.06);
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pitem:last-child { border-bottom: none; }
+.pitem:hover { background: var(--sky); }
+.pitem.checked { background: #f8fdf9; }
+.pitem.hidden { display: none; }
+.pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+.pdot.high { background: var(--coral); }
+.pdot.med  { background: var(--sun); }
+.pdot.low  { background: transparent; }
+.pchk {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(10,104,128,.25);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all .2s;
+}
+.pitem.checked .pchk { background: var(--leaf); border-color: var(--leaf); }
+.ptick { color: #fff; font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .2s; }
+.pitem.checked .ptick { opacity: 1; }
+.pbody { flex: 1; min-width: 0; }
+.pname { font-size: 15px; color: var(--dark); transition: all .2s; }
+.pitem.checked .pname { color: #94a3a8; text-decoration: line-through; }
+.pnote { font-size: 12px; color: var(--mid); margin-top: 2px; line-height: 1.5; }
+.pdel-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #c0ccd0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 5px;
+  transition: all .15s;
+  margin-top: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pdel-btn:hover { background: #fdecea; color: var(--coral); }
+
+/* ─── MODAL ─── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(22,40,48,.52);
+  z-index: 500;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--light);
+  border-radius: 22px 22px 0 0;
+  width: 100%;
+  max-width: 540px;
+  padding: 28px 24px 40px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  animation: slideUp .24s ease both;
+}
+@keyframes slideUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.modal-handle {
+  width: 44px; height: 5px;
+  background: #d0dde3;
+  border-radius: 3px;
+  margin: 0 auto 20px;
+}
+.modal h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ocean);
+  margin-bottom: 16px;
+}
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  color: var(--mid);
+  margin-top: 14px;
+  margin-bottom: 5px;
+}
+.form-label:first-of-type { margin-top: 0; }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--dark);
+  background: var(--sky);
+  outline: none;
+  transition: border-color .2s, background .2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--ocean2);
+  background: #fff;
+}
+.form-textarea { height: 88px; resize: none; }
+.modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+.btn-primary {
+  flex: 1;
+  padding: 13px;
+  background: var(--ocean);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary:hover { background: var(--ocean2); }
+.btn-ghost {
+  padding: 13px 16px;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--mid);
+  cursor: pointer;
+  transition: border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-ghost:hover { border-color: var(--ocean2); }
+.btn-danger {
+  padding: 13px 14px;
+  background: #fdecea;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Aptos', 'Arial', sans-serif;
+  font-size: 18px;
+  color: var(--coral);
+  cursor: pointer;
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-danger:hover { background: #fbd5d0; }
+
+/* ─── EMPTY STATE ─── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--mid);
+}
+.empty-icon { font-size: 52px; opacity: .3; margin-bottom: 14px; }
+.empty-text { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.empty-hint { font-size: 14px; color: #aac0c8; }
+
+/* ─── CONFETTI ─── */
+.cfwrap { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+.cfp {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  animation: cfall linear forwards;
+}
+@keyframes cfall {
+  0%   { transform: translateY(-10px) rotate(0);    opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── NAME GATE ─── */
+.name-gate-overlay {
+  position: fixed; inset: 0;
+  background: rgba(22,40,48,.6);
+  z-index: 8000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.name-gate-overlay.hidden { display: none; }
+.name-gate-card {
+  background: #fff; border-radius: 22px; padding: 36px 28px;
+  width: 100%; max-width: 360px; text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,.2);
+}
+.name-gate-icon   { font-size: 48px; margin-bottom: 12px; }
+.name-gate-title  { font-size: 22px; font-weight: 700; color: var(--ocean); margin-bottom: 6px; }
+.name-gate-sub    { font-size: 14px; color: var(--mid); margin-bottom: 20px; }
+.name-gate-input  {
+  width: 100%; padding: 14px; border: 2px solid var(--border);
+  border-radius: 12px; font-size: 18px; text-align: center;
+  outline: none; font-family: inherit; transition: border-color .2s;
+}
+.name-gate-input:focus { border-color: var(--ocean2); }
+.name-gate-btn {
+  margin-top: 14px; width: 100%; padding: 14px;
+  background: var(--ocean); color: #fff; border: none;
+  border-radius: 12px; font-size: 18px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: background .15s;
+}
+.name-gate-btn:hover { background: var(--ocean2); }
+
+/* ─── HERO USER ─── */
+.hero-user-wrap {
+  font-size: 13px; color: rgba(255,255,255,.85);
+  margin-top: 8px; position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.hero-user-badge {
+  background: rgba(255,255,255,.2); border-radius: 100px;
+  padding: 3px 12px; font-weight: 600;
+}
+.hero-user-change {
+  font-size: 11px; color: rgba(255,255,255,.5);
+  cursor: pointer; text-decoration: underline;
+}
+
+/* ─── PACK USER CHIPS ─── */
+.pack-users {
+  display: flex; gap: 8px; margin-bottom: 14px;
+  flex-wrap: wrap; align-items: center;
+}
+.pack-user-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 100px;
+  background: #fff; border: 1.5px solid var(--border);
+  font-size: 12px; color: var(--mid);
+  box-shadow: var(--shadow);
+}
+.pack-user-chip .pu-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pack-user-chip .pu-name { font-weight: 600; }
+
+/* ─── PCHECK CHIPS ─── */
+.pitem-checks {
+  display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px;
+}
+.pcheck-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: 100px;
+  font-size: 11px; font-weight: 600;
+  border: 1.5px solid #dde5e9;
+  background: #f0f4f6; color: #888;
+  transition: all .15s;
+  user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.pcheck-chip.done { color: #fff; }
+.pcheck-chip.mine-chip { cursor: pointer; }
+.pcheck-chip.mine-chip:hover { opacity: .85; }
+
+/* ─── AI HINT CARD ─── */
+.hint-card {
+  margin: 14px 14px 0;
+  background: linear-gradient(135deg, #0A5870 0%, #0D8FB5 100%);
+  border-radius: 16px;
+  padding: 13px 16px;
+  display: flex; align-items: flex-start; gap: 11px;
+  box-shadow: 0 2px 12px rgba(10,104,128,.18);
+  animation: fadeUp .4s ease both;
+  position: relative; overflow: hidden;
+  cursor: default;
+}
+.hint-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 90% 50%, rgba(255,255,255,.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hint-icon {
+  font-size: 20px; flex-shrink: 0; margin-top: 1px; line-height: 1;
+}
+.hint-body { flex: 1; min-width: 0; }
+.hint-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: rgba(255,255,255,.55);
+  margin-bottom: 3px;
+}
+.hint-text {
+  font-size: 13px; color: #fff; line-height: 1.55;
+  font-weight: 500;
+}
+.hint-refresh {
+  background: none; border: none; color: rgba(255,255,255,.4);
+  font-size: 14px; cursor: pointer; padding: 2px 4px;
+  flex-shrink: 0; transition: color .15s, transform .3s;
+  -webkit-tap-highlight-color: transparent;
+}
+.hint-refresh:hover { color: rgba(255,255,255,.8); }
+.hint-refresh.spin { transform: rotate(360deg); }
+.hint-skeleton {
+  height: 13px; background: rgba(255,255,255,.15);
+  border-radius: 6px; animation: shimmer 1.4s infinite;
+}
+.hint-skeleton.short { width: 55%; margin-top: 6px; }
+@keyframes shimmer {
+  0%,100% { opacity: .5; } 50% { opacity: 1; }
+}
+
+/* ─── AI CHAT ─── */
+.ai-fab {
+  position: fixed; bottom: 24px; right: 20px; z-index: 400;
+  width: 56px; height: 56px; border-radius: 18px;
+  background: linear-gradient(145deg, #0e1f3d 0%, #0A6880 60%, #1597B8 100%);
+  border: none; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 24px rgba(10,104,128,.45), 0 0 0 1px rgba(255,255,255,.08) inset;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s, box-shadow .2s, border-radius .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ai-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 8px 32px rgba(10,104,128,.55), 0 0 0 1px rgba(255,255,255,.12) inset;
+  border-radius: 20px;
+}
+.ai-fab svg { width: 26px; height: 26px; }
+.ai-fab .ai-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--coral); color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 100px; padding: 1px 5px; min-width: 18px; text-align: center;
+  display: none;
+}
+.ai-fab .ai-badge.show { display: block; }
+
+.ai-drawer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 450;
+  background: #fff; border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.15);
+  display: flex; flex-direction: column;
+  max-height: 85vh; height: 520px;
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.32,1,.36,1);
+}
+.ai-drawer.open { transform: translateY(0); }
+.ai-drawer-handle {
+  width: 40px; height: 5px; background: #d0dde3; border-radius: 3px;
+  margin: 12px auto 0; flex-shrink: 0;
+}
+.ai-drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px 10px; flex-shrink: 0;
+}
+.ai-drawer-title { font-size: 16px; font-weight: 700; color: var(--ocean); display: flex; align-items: center; gap: 7px; }
+.ai-drawer-close {
+  width: 32px; height: 32px; border: none; background: var(--sky);
+  border-radius: 50%; font-size: 16px; cursor: pointer; color: var(--mid);
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.ai-limit-bar {
+  margin: 0 18px 8px; padding: 6px 10px; background: var(--sky);
+  border-radius: 8px; font-size: 11px; color: var(--mid);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.ai-limit-used { font-weight: 700; color: var(--ocean); }
+.ai-limit-cd { color: var(--coral); font-weight: 700; }
+
+.ai-msgs {
+  flex: 1; overflow-y: auto; padding: 4px 18px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  scroll-behavior: smooth;
+}
+.ai-msg { display: flex; gap: 8px; align-items: flex-start; }
+.ai-msg.user { flex-direction: row-reverse; }
+.ai-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; margin-top: 2px;
+}
+.ai-avatar.bot { background: linear-gradient(135deg,#0A6880,#1597B8); color: #fff; }
+.ai-avatar.usr { background: var(--sky2); font-size: 12px; }
+.ai-bubble {
+  max-width: 78%; padding: 9px 13px; border-radius: 16px;
+  font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+}
+.ai-msg.bot .ai-bubble { background: var(--sky); color: var(--dark); border-top-left-radius: 4px; }
+.ai-msg.user .ai-bubble { background: var(--ocean); color: #fff; border-top-right-radius: 4px; }
+.ai-msg.bot.loading .ai-bubble { color: var(--mid); font-style: italic; }
+
+.ai-quick-wrap {
+  padding: 0 18px 8px; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0;
+}
+.ai-quick {
+  font-family: inherit; font-size: 12px; padding: 6px 12px;
+  border: 1.5px solid var(--border); border-radius: 100px;
+  background: #fff; color: var(--ocean); cursor: pointer;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.ai-quick:hover { background: var(--sky); border-color: var(--ocean2); }
+.ai-quick:disabled { opacity: .45; cursor: not-allowed; }
+
+.ai-input-row {
+  display: flex; gap: 8px; padding: 10px 18px 20px; flex-shrink: 0;
+  border-top: 1px solid var(--sky2);
+}
+.ai-input {
+  flex: 1; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: 100px; font-family: inherit; font-size: 14px;
+  color: var(--dark); outline: none; transition: border-color .2s;
+  background: var(--sky);
+}
+.ai-input:focus { border-color: var(--ocean2); background: #fff; }
+.ai-send {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--ocean); border: none; color: #fff;
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s; -webkit-tap-highlight-color: transparent;
+}
+.ai-send:hover { background: var(--ocean2); }
+.ai-send:disabled { background: #aac0c8; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <p class="loading-text">データを読み込み中…</p>
+</div>
+
+<!-- NAME GATE -->
+<div class="name-gate-overlay" id="nameGateOverlay">
+  <div class="name-gate-card">
+    <div class="name-gate-icon">🌺</div>
+    <div class="name-gate-title">Hawaii Trip Planner</div>
+    <div class="name-gate-sub">あなたの名前を入力してください<br>持ち物チェックに使用されます</div>
+    <input class="name-gate-input" id="nameGateInput" placeholder="例：Leo" maxlength="12" autocomplete="off">
+    <button class="name-gate-btn" onclick="submitName()">スタート →</button>
+  </div>
+</div>
+
+<!-- SYNC INDICATOR -->
+<div class="sync-indicator" id="syncIndicator">保存中…</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="sun-spin">☀️</div>
+  <p class="hero-eyebrow">Hawaii Trip Planner</p>
+  <h1 class="hero-title">🌺 Aloha, Hawaii</h1>
+  <p class="hero-sub">旅程 · メモ · 持ち物リスト</p>
+  <div class="hero-user-wrap" id="heroUserWrap" style="display:none">
+    <span>ようこそ</span>
+    <span class="hero-user-badge" id="heroUserName"></span>
+    <span class="hero-user-change" onclick="changeName()">変更</span>
+  </div>
+  <div class="hero-progress-wrap">
+    <div class="hero-progress-track">
+      <div class="hero-progress-bar" id="heroBar"></div>
+    </div>
+    <p class="hero-progress-label" id="heroLbl">持ち物 0 / 0 準備完了</p>
+  </div>
+  <div class="hero-wave">
+    <svg viewBox="0 0 1440 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 32C180 64 360 0 540 32C720 64 900 0 1080 32C1260 64 1380 16 1440 32V64H0V32Z" fill="#EAF7FB"/>
+    </svg>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('itinerary', this)">
+    <span class="tab-icon">🗓️</span>旅程
+  </button>
+  <button class="tab-btn" onclick="switchTab('memo', this)">
+    <span class="tab-icon">📝</span>メモ
+  </button>
+  <button class="tab-btn" onclick="switchTab('packing', this)">
+    <span class="tab-icon">🧳</span>持ち物
+  </button>
+</nav>
+
+<!-- AI HINT CARD -->
+<div class="hint-card" id="hintCard" style="display:none">
+  <div class="hint-icon" id="hintIcon">✨</div>
+  <div class="hint-body">
+    <div class="hint-label">AIからのヒント</div>
+    <div id="hintText">
+      <div class="hint-skeleton"></div>
+      <div class="hint-skeleton short"></div>
+    </div>
+  </div>
+  <button class="hint-refresh" id="hintRefreshBtn" onclick="fetchHint(true)" title="更新">↻</button>
+</div>
+
+<!-- ══════════ ITINERARY PAGE ══════════ -->
+<div class="page active" id="page-itinerary">
+  <div class="page-inner">
+    <div class="itn-top-bar">
+      <div class="sec-heading">🗓️ 旅程</div>
+      <button class="action-btn" onclick="openDayModal(null)">＋ 日程を追加</button>
+    </div>
+    <div id="itnContainer">
+      <div class="empty-state">
+        <div class="empty-icon">🗓️</div>
+        <div class="empty-text">旅程がまだありません</div>
+        <div class="empty-hint">右上の「＋ 日程を追加」から始めましょう</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MEMO PAGE ══════════ -->
+<div class="page" id="page-memo">
+  <div class="page-inner">
+    <div class="memo-top-bar">
+      <div class="sec-heading">📝 メモ</div>
+      <button class="action-btn" onclick="openMemoModal(null)">＋ 追加</button>
+    </div>
+    <div id="memoList">
+      <div class="memo-empty">
+        <div class="memo-empty-icon">📄</div>
+        <div class="memo-empty-text">メモはまだありません</div>
+        <div class="memo-empty-hint">右上の「＋ 追加」から作成できます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PACKING PAGE ══════════ -->
+<div class="page" id="page-packing">
+  <div class="page-inner">
+    <div class="sec-heading">🧳 持ち物リスト</div>
+    <div class="pack-stats">
+      <div class="pack-stat">
+        <div class="pstat-num" id="pTotal">0</div>
+        <div class="pstat-lbl">総アイテム</div>
+      </div>
+      <div class="pack-stat">
+        <div class="pstat-num" id="pDone">0</div>
+        <div class="pstat-lbl">全員完了</div>
+      </div>
+      <div class="pack-stat">
+        <div class="pstat-num" id="pLeft">0</div>
+        <div class="pstat-lbl">自分完了</div>
+      </div>
+    </div>
+    <div class="pack-users" id="packUsers"></div>
+    <div class="legend">
+      <span>優先度：</span>
+      <span class="legend-item"><span class="ldot" style="background:#E86B4E"></span>必須</span>
+      <span class="legend-item"><span class="ldot" style="background:#D4A017"></span>あると便利</span>
+    </div>
+    <div class="pack-toolbar">
+      <button class="pill active" id="pbAll"       onclick="packFilter('all')">すべて</button>
+      <button class="pill"        id="pbUnchecked"  onclick="packFilter('unchecked')">未完了</button>
+      <button class="pill"        id="pbChecked"    onclick="packFilter('checked')">全員完了</button>
+      <button class="pill"                          onclick="packReset()">自分リセット</button>
+    </div>
+    <div class="srch-wrap">
+      <span class="srch-icon">🔍</span>
+      <input type="text" placeholder="アイテムを検索…" oninput="packSearch(this.value)" autocomplete="off">
+    </div>
+    <div id="packContainer"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Day Modal -->
+<div class="modal-overlay" id="dayModal" onclick="overlayClose(event,'dayModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="dayModalTitle">日程を追加</h3>
+    <label class="form-label">ラベル（例：Day 1）</label>
+    <input class="form-input" id="dayLabel" placeholder="Day 1" autocomplete="off">
+    <label class="form-label">日付・サブタイトル</label>
+    <input class="form-input" id="dayDate" placeholder="例：6月10日（月）" autocomplete="off">
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="dayTitle" placeholder="例：ワイキキ散策" autocomplete="off">
+    <label class="form-label">宿泊ホテル</label>
+    <input class="form-input" id="dayHotel" placeholder="例：ヒルトン ハワイアン ビレッジ" autocomplete="off">
+    <label class="form-label">カラー</label>
+    <select class="form-select" id="dayColor">
+      <option value="#0A6880">🔵 ディープオーシャン</option>
+      <option value="#0D8FB5">🩵 オーシャンブルー</option>
+      <option value="#3A7D44">🟢 トロピカルグリーン</option>
+      <option value="#E86B4E">🪸 コーラル</option>
+      <option value="#6B5EA8">🟣 サンセットパープル</option>
+      <option value="#C49A2A">🟡 サンゴールド</option>
+      <option value="#2D4A56">🌊 ダークネイビー</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeDayModal()">キャンセル</button>
+      <button id="dayDelBtn" class="btn-danger" onclick="deleteDay()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveDay()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Modal -->
+<div class="modal-overlay" id="evModal" onclick="overlayClose(event,'evModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="evModalTitle">イベントを追加</h3>
+    <label class="form-label">時間</label>
+    <input class="form-input" id="evTime" placeholder="例：09:00" autocomplete="off">
+    <label class="form-label">タイプ</label>
+    <select class="form-select" id="evType">
+      <option value="sight">🏛 観光</option>
+      <option value="food">🍽 食事</option>
+      <option value="beach">🏖 ビーチ</option>
+      <option value="activity">🏄 アクティビティ</option>
+      <option value="hotel">🏨 ホテル</option>
+      <option value="flight">✈️ フライト</option>
+    </select>
+    <label class="form-label">名前</label>
+    <input class="form-input" id="evName" placeholder="例：ダイヤモンドヘッド登山" autocomplete="off">
+    <label class="form-label">📍 住所・場所メモ</label>
+    <input class="form-input" id="evAddr" placeholder="例：Diamond Head Rd, Honolulu, HI" autocomplete="off">
+    <label class="form-label">🔗 URL（予約ページ・地図など）</label>
+    <input class="form-input" id="evUrl" placeholder="https://..." type="url" autocomplete="off">
+    <label class="form-label">メモ（任意）</label>
+    <textarea class="form-textarea" id="evNote" placeholder="詳細・予約番号など"></textarea>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeEvModal()">キャンセル</button>
+      <button id="evDelBtn" class="btn-danger" onclick="deleteEv()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveEv()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memo Modal -->
+<div class="modal-overlay" id="memoModal" onclick="overlayClose(event,'memoModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="memoModalTitle">メモを追加</h3>
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="memoTitleIn" placeholder="例：ホテルの予約情報" autocomplete="off">
+    <label class="form-label">内容</label>
+    <textarea class="form-textarea" id="memoBodyIn" placeholder="メモを入力…" style="height:130px"></textarea>
+    <label class="form-label">カラー</label>
+    <select class="form-select" id="memoColorIn">
+      <option value="ocean">🔵 ブルー（デフォルト）</option>
+      <option value="coral">🔴 コーラル</option>
+      <option value="leaf">🟢 グリーン</option>
+      <option value="sun">🟡 イエロー</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeMemoModal()">キャンセル</button>
+      <button id="memoDelBtn" class="btn-danger" onclick="deleteMemo()" style="display:none">削除</button>
+      <button class="btn-primary" onclick="saveMemo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="cfwrap" id="cfwrap"></div>
+
+<!-- AI CHAT FAB -->
+<button class="ai-fab" id="aiFab" onclick="toggleAiDrawer()" aria-label="AIアシスタント">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="white" opacity="0.95"/>
+    <path d="M19 16L19.8 18.2L22 19L19.8 19.8L19 22L18.2 19.8L16 19L18.2 18.2L19 16Z" fill="white" opacity="0.7"/>
+    <path d="M6 3L6.6 4.9L8.5 5.5L6.6 6.1L6 8L5.4 6.1L3.5 5.5L5.4 4.9L6 3Z" fill="white" opacity="0.55"/>
+  </svg>
+  <span class="ai-badge" id="aiBadge"></span>
+</button>
+
+<!-- AI CHAT DRAWER -->
+<div class="ai-drawer" id="aiDrawer">
+  <div class="ai-drawer-handle"></div>
+  <div class="ai-drawer-head">
+    <div class="ai-drawer-title">✨ AIアシスタント</div>
+    <button class="ai-drawer-close" onclick="toggleAiDrawer()">✕</button>
+  </div>
+  <div class="ai-limit-bar">
+    <span>本日の残り：<span class="ai-limit-used" id="aiRemain">10</span>回</span>
+    <span class="ai-limit-cd" id="aiCdText" style="display:none"></span>
+  </div>
+  <div class="ai-msgs" id="aiMsgs">
+    <div class="ai-msg bot">
+      <div class="ai-avatar bot">✨</div>
+      <div class="ai-bubble">こんにちは！旅行の準備や予定について何でも聞いてください🌺</div>
+    </div>
+  </div>
+  <div class="ai-quick-wrap" id="aiQuicks">
+    <button class="ai-quick" onclick="aiQuick('あと何日で出発？')">あと何日？</button>
+    <button class="ai-quick" onclick="aiQuick('今日の予定を教えて')">今日の予定</button>
+    <button class="ai-quick" onclick="aiQuick('まだ準備できていない持ち物は？')">未準備チェック</button>
+    <button class="ai-quick" onclick="aiQuick('旅行までにやるべきことは？')">やること整理</button>
+  </div>
+  <div class="ai-input-row">
+    <input class="ai-input" id="aiInput" placeholder="メッセージを入力…" autocomplete="off"
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}">
+    <button class="ai-send" id="aiSendBtn" onclick="aiSend()">➤</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════════════
+//  SUPABASE SETUP
+// ══════════════════════════════════════════════════════
+const SUPABASE_URL     = "https://qqjiyrqfxjdmmghuwzex.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaml5cnFmeGpkbW1naHV3emV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTUwNDcsImV4cCI6MjA5NTg5MTA0N30.FHEATyLy8iyaUrzOtwBUD4PUo82PMlPX-H9qk2Hwguw";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// URLパラメータで旅行コードを切り替え可能
+const shareCode = new URLSearchParams(location.search).get("trip") || "default";
+
+// ══════════════════════════════════════════════════════
+//  USER（端末キーはlocalStorage、名前はDB保存）
+// ══════════════════════════════════════════════════════
+
+// 端末固有キー（この端末がどのユーザーかを識別）
+let DEVICE_KEY = localStorage.getItem('hawaii_device_key');
+if (!DEVICE_KEY) {
+  DEVICE_KEY = 'dk_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('hawaii_device_key', DEVICE_KEY);
+}
+
+// 自分の名前（DBのS.users[DEVICE_KEY].nameから取得）
+let ME = '';
+
+const USER_PALETTE = ['#0A6880','#E86B4E','#3A7D44','#7B5EA8','#D4A017','#1597B8','#C03E6B','#2E7D32','#5C6BC0','#F4511E'];
+
+function userColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return USER_PALETTE[h % USER_PALETTE.length];
+}
+
+// DBからロード後に自分の名前を復元
+function restoreMe() {
+  if (S.users && S.users[DEVICE_KEY]) {
+    ME = S.users[DEVICE_KEY].name || '';
   }
+}
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
+async function submitName() {
+  const v = document.getElementById('nameGateInput').value.trim();
+  if (!v) { document.getElementById('nameGateInput').focus(); return; }
+  ME = v;
+  // DBに保存（S.users に自分のエントリを書き込む）
+  if (!S.users) S.users = {};
+  S.users[DEVICE_KEY] = { name: ME, color: userColor(ME) };
+  document.getElementById('nameGateOverlay').classList.add('hidden');
+  showHeroUser();
+  renderPack();
+  await saveState();
+}
 
-  const { system, userMsg, maxTokens = 512 } = req.body;
-  if (!userMsg) {
-    return res.status(400).json({ error: 'userMsg is required' });
-  }
+async function changeName() {
+  document.getElementById('nameGateInput').value = ME;
+  document.getElementById('nameGateOverlay').classList.remove('hidden');
+}
 
+function showHeroUser() {
+  if (!ME) return;
+  const wrap = document.getElementById('heroUserWrap');
+  const name = document.getElementById('heroUserName');
+  if (wrap) wrap.style.display = 'flex';
+  if (name) name.textContent = ME;
+}
+
+// ══════════════════════════════════════════════════════
+//  DEFAULT PACKING LIST（プリセット）
+// ══════════════════════════════════════════════════════
+const DEFAULT_PACK = [
+  {id:'docs',icon:'🛂',name:'書類・貴重品',items:[
+    {id:'d1',name:'パスポート',note:'有効期限6ヶ月以上確認',p:'high'},
+    {id:'d2',name:'ESTA（渡航認証）',note:'出発72時間前までに申請',p:'high'},
+    {id:'d3',name:'航空券（eチケット）',note:'プリントorスマホ保存',p:'high'},
+    {id:'d4',name:'ホテル予約確認書',note:'オフラインでも確認できるよう保存',p:'high'},
+    {id:'d5',name:'クレジットカード',note:'海外利用可能・複数枚推奨',p:'high'},
+    {id:'d6',name:'現金（USD）',note:'到着後両替またはATM利用',p:'high'},
+    {id:'d7',name:'海外旅行保険証書',note:'クレカ付帯の場合は条件確認',p:'high'},
+    {id:'d8',name:'国際免許証',note:'レンタカーを使う場合',p:'med'},
+    {id:'d9',name:'パスポートのコピー',note:'紛失時のため別に保管',p:'med'},
+  ]},
+  {id:'clothes',icon:'👕',name:'衣類',items:[
+    {id:'c1',name:'Tシャツ・半袖シャツ',note:'6〜7枚（リゾートカジュアル対応も）',p:'high'},
+    {id:'c2',name:'ショートパンツ',note:'3〜4枚',p:'high'},
+    {id:'c3',name:'水着',note:'2〜3枚（乾きにくい日に備えて複数）',p:'high'},
+    {id:'c4',name:'ラッシュガード',note:'日焼け対策・マリンアクティビティに',p:'high'},
+    {id:'c5',name:'カーディガン・薄手の羽織り',note:'室内冷房・夜の気温差対策',p:'high'},
+    {id:'c6',name:'下着・靴下',note:'8セット',p:'high'},
+    {id:'c7',name:'スニーカー・歩きやすいサンダル',note:'トレッキングはスニーカー必須',p:'high'},
+    {id:'c8',name:'ビーチサンダル',note:'',p:'high'},
+    {id:'c9',name:'スマートカジュアルな服',note:'レストランディナー用',p:'med'},
+    {id:'c10',name:'UVカット帽子',note:'日差しが強い',p:'high'},
+    {id:'c11',name:'サングラス',note:'',p:'high'},
+  ]},
+  {id:'beach',icon:'🏖️',name:'ビーチ・アクティビティ',items:[
+    {id:'b1',name:'日焼け止め（高SPF）',note:'SPF50+推奨・リーフセーフ製品が◎',p:'high'},
+    {id:'b2',name:'ビーチタオル',note:'ホテルにある場合も多い',p:'med'},
+    {id:'b3',name:'防水バッグ・ドライバッグ',note:'スマホ・財布の保護に',p:'med'},
+    {id:'b4',name:'シュノーケルセット',note:'レンタル可だが持参で節約',p:'med'},
+    {id:'b5',name:'水中カメラ・防水ケース',note:'',p:'med'},
+    {id:'b6',name:'虫除けスプレー',note:'山・ジャングルエリア向け',p:'med'},
+  ]},
+  {id:'tech',icon:'📱',name:'デジタル・ガジェット',items:[
+    {id:'t1',name:'スマートフォン + 充電器',note:'',p:'high'},
+    {id:'t2',name:'モバイルバッテリー',note:'10000mAh以上推奨',p:'high'},
+    {id:'t3',name:'SIMカード or 海外eSIM',note:'事前にアクティベート推奨',p:'high'},
+    {id:'t4',name:'カメラ',note:'バッテリー・メモリーカード確認',p:'med'},
+    {id:'t5',name:'ノイズキャンセリングイヤホン',note:'長距離フライト向け',p:'med'},
+    {id:'t6',name:'マルチ充電ケーブル',note:'Lightning / USB-C など',p:'med'},
+  ]},
+  {id:'health',icon:'💊',name:'衛生・医療品',items:[
+    {id:'h1',name:'常備薬',note:'胃腸薬・痛み止め・酔い止め',p:'high'},
+    {id:'h2',name:'処方薬',note:'十分な量＋英語の処方箋',p:'high'},
+    {id:'h3',name:'バンドエイド・救急セット',note:'',p:'med'},
+    {id:'h4',name:'歯ブラシ・歯磨き粉',note:'',p:'high'},
+    {id:'h5',name:'洗顔料・化粧品',note:'',p:'high'},
+    {id:'h6',name:'アフターサン（日焼けケア）',note:'',p:'med'},
+    {id:'h7',name:'除菌シート・ウェットティッシュ',note:'',p:'med'},
+  ]},
+  {id:'travel_gear',icon:'🧳',name:'旅行用品',items:[
+    {id:'tr1',name:'スーツケース（機内預け）',note:'重量制限確認：通常23kg',p:'high'},
+    {id:'tr2',name:'キャリーバッグ（機内持ち込み）',note:'7〜10kg以内',p:'high'},
+    {id:'tr3',name:'ネックピロー',note:'機内での長時間フライトに',p:'med'},
+    {id:'tr4',name:'アイマスク・耳栓',note:'機内・ホテルでの快適睡眠に',p:'med'},
+    {id:'tr5',name:'ジップロック・圧縮袋',note:'液体物・水着の整理に',p:'med'},
+    {id:'tr6',name:'折りたたみエコバッグ',note:'お土産・ショッピング用',p:'low'},
+    {id:'tr7',name:'筆記用具',note:'入国カード記入に',p:'med'},
+  ]},
+  {id:'misc',icon:'✨',name:'その他',items:[
+    {id:'m1',name:'Google マップ・オフライン地図保存',note:'事前にダウンロードしておく',p:'high'},
+    {id:'m2',name:'Uber / Lyft アプリ設定',note:'ハワイはタクシーより便利',p:'high'},
+    {id:'m3',name:'旅行ガイドブック',note:'',p:'low'},
+    {id:'m4',name:'日本のお菓子（保険食）',note:'',p:'low'},
+    {id:'m5',name:'洗濯ネット',note:'長期滞在時のコインランドリー用',p:'low'},
+  ]},
+];
+
+// ══════════════════════════════════════════════════════
+//  STATE
+//  S は必ず loadState() で初期化してから使う
+// ══════════════════════════════════════════════════════
+let S = {
+  days:        [],   // 旅程
+  memos:       [],   // メモ
+  packChecked: {},   // { itemId: { userName: true } }
+  packDeleted: {},   // { itemId: true }
+  users:       {},   // { deviceKey: { name, color } }
+};
+
+// Realtime の重複更新を防ぐフラグ
+let isSaving = false;
+
+// ══════════════════════════════════════════════════════
+//  DB HELPERS
+// ══════════════════════════════════════════════════════
+
+/**
+ * Supabase から状態を読み込む。
+ * レコードがなければデフォルト値を返す。
+ */
+async function loadState() {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const { data, error } = await db
+      .from("trip_plans")
+      .select("data")
+      .eq("share_code", shareCode)
+      .maybeSingle();   // レコードなし → null（エラーにならない）
+
+    if (error) {
+      console.error("loadState error:", error);
+      return;
+    }
+
+    if (data && data.data) {
+      // DB の値をマージ（欠けているキーはデフォルト値で補完）
+      S = {
+        days:        Array.isArray(data.data.days)        ? data.data.days        : [],
+        memos:       Array.isArray(data.data.memos)       ? data.data.memos       : [],
+        packChecked: data.data.packChecked && typeof data.data.packChecked === 'object' ? data.data.packChecked : {},
+        packDeleted: data.data.packDeleted && typeof data.data.packDeleted === 'object' ? data.data.packDeleted : {},
+        users:       data.data.users       && typeof data.data.users       === 'object' ? data.data.users       : {},
+      };
+    }
+    // data === null の場合は S のデフォルト値をそのまま使う
+  } catch (e) {
+    console.error("loadState exception:", e);
+  }
+}
+
+/** シンクインジケータを表示して自動的に消す */
+let syncTimer = null;
+function showSync(msg = '保存中…', isError = false) {
+  const el = document.getElementById('syncIndicator');
+  el.textContent = msg;
+  el.classList.toggle('error', isError);
+  el.classList.add('visible');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => el.classList.remove('visible'), 1800);
+}
+
+/**
+ * 現在の S を Supabase に upsert する。
+ * 保存中は重複保存しない（楽観的ロック簡易版）。
+ */
+async function saveState() {
+  isSaving = true;
+  showSync('保存中…');
+  try {
+    const { error } = await db
+      .from("trip_plans")
+      .upsert({
+        share_code: shareCode,
+        data: S,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'share_code' });
+
+    if (error) {
+      console.error("saveState error:", error);
+      showSync('保存失敗 ⚠️', true);
+    } else {
+      showSync('保存しました ✓');
+    }
+  } catch (e) {
+    console.error("saveState exception:", e);
+    showSync('保存失敗 ⚠️', true);
+  } finally {
+    isSaving = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  全画面一括レンダリング
+// ══════════════════════════════════════════════════════
+function renderAll() {
+  renderItn();
+  renderMemos();
+  renderPack();
+}
+
+// ══════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════
+//  ITINERARY
+// ══════════════════════════════════════════════════════
+const TYPE_META = {
+  flight:   { lbl: 'フライト',       bc: 'b-flight',   dc: 't-flight' },
+  food:     { lbl: '食事',           bc: 'b-food',     dc: 't-food' },
+  sight:    { lbl: '観光',           bc: 'b-sight',    dc: 't-sight' },
+  hotel:    { lbl: 'ホテル',         bc: 'b-hotel',    dc: 't-hotel' },
+  beach:    { lbl: 'ビーチ',         bc: 'b-beach',    dc: 't-beach' },
+  activity: { lbl: 'アクティビティ', bc: 'b-activity',  dc: 't-activity' },
+};
+
+let editDayId   = null;
+let editEvId    = null;
+let editEvDayId = null;
+
+function renderItn() {
+  const c = document.getElementById('itnContainer');
+  if (!S.days.length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🗓️</div>
+      <div class="empty-text">旅程がまだありません</div>
+      <div class="empty-hint">右上の「＋ 日程を追加」から始めましょう</div>
+    </div>`;
+    return;
+  }
+  c.innerHTML = S.days.map(day => `
+    <div class="day-card" id="dc_${day.id}">
+      <div class="day-hdr" style="background:${day.color || '#0A6880'}">
+        <div class="day-num">${(day.label || '').replace(/Day\s*/i, '')}</div>
+        <div class="day-info" onclick="toggleTimeline('tl_${day.id}','chev_${day.id}')">
+          <div class="day-label">${day.label || ''} · ${day.date || ''}</div>
+          <div class="day-date-text">${day.title || ''}</div>
+          ${day.hotel ? `<div class="day-hotel-badge">🏨 ${day.hotel}</div>` : ''}
+        </div>
+        <div class="day-hdr-actions">
+          <button class="icon-btn" title="日程を編集" onclick="openDayModal('${day.id}')">✏️</button>
+          <button class="icon-btn" title="開閉" onclick="toggleTimeline('tl_${day.id}','chev_${day.id}')">
+            <span class="day-chev" id="chev_${day.id}">▼</span>
+          </button>
+        </div>
+      </div>
+      <div class="timeline" id="tl_${day.id}">
+        ${day.events && day.events.length
+          ? day.events.map(ev => renderEvRow(ev, day.id)).join('')
+          : `<div style="padding:14px 0;font-size:14px;color:var(--mid);text-align:center;">イベントがまだありません</div>`
+        }
+        <div class="tl-add-wrap">
+          <button class="tl-add-btn" onclick="openEvModal('${day.id}', null)">＋ イベントを追加</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderEvRow(ev, dayId) {
+  const m = TYPE_META[ev.type] || TYPE_META.sight;
+  const addrHtml = ev.addr ? `<div class="tl-addr">📍 ${ev.addr}</div>` : '';
+  const mapUrl   = ev.addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.addr)}` : '';
+  const linksHtml = (ev.url || mapUrl) ? `<div class="tl-links">
+    ${ev.url  ? `<a class="tl-link" href="${ev.url}" target="_blank" rel="noopener">🔗 リンク</a>` : ''}
+    ${mapUrl  ? `<a class="tl-link" href="${mapUrl}" target="_blank" rel="noopener">🗺 地図</a>` : ''}
+  </div>` : '';
+  return `
+    <div class="tl-row">
+      <div class="tl-time-col"><div class="tl-time">${ev.time || ''}</div></div>
+      <div class="tl-dot-wrap"><div class="tl-dot ${m.dc}"></div></div>
+      <div class="tl-body">
+        <span class="tl-badge ${m.bc}">${m.lbl}</span>
+        <div class="tl-name">${ev.name || ''}</div>
+        ${addrHtml}${linksHtml}
+        ${ev.note ? `<div class="tl-note">${ev.note}</div>` : ''}
+      </div>
+      <button class="tl-edit-btn" onclick="openEvModal('${dayId}','${ev.id}')">✏️</button>
+    </div>`;
+}
+
+function toggleTimeline(tlId, chevId) {
+  const tl   = document.getElementById(tlId);
+  const chev = document.getElementById(chevId);
+  if (!tl) return;
+  const isOpen = tl.classList.contains('open');
+  tl.classList.toggle('open', !isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+
+/* ── Day Modal ── */
+function openDayModal(dayId) {
+  editDayId = dayId;
+  if (dayId) {
+    const day = S.days.find(d => d.id === dayId);
+    document.getElementById('dayModalTitle').textContent = '日程を編集';
+    document.getElementById('dayLabel').value  = day.label  || '';
+    document.getElementById('dayDate').value   = day.date   || '';
+    document.getElementById('dayTitle').value  = day.title  || '';
+    document.getElementById('dayHotel').value  = day.hotel  || '';
+    document.getElementById('dayColor').value  = day.color  || '#0A6880';
+    document.getElementById('dayDelBtn').style.display = '';
+  } else {
+    document.getElementById('dayModalTitle').textContent = '日程を追加';
+    document.getElementById('dayLabel').value  = '';
+    document.getElementById('dayDate').value   = '';
+    document.getElementById('dayTitle').value  = '';
+    document.getElementById('dayHotel').value  = '';
+    document.getElementById('dayColor').value  = '#0A6880';
+    document.getElementById('dayDelBtn').style.display = 'none';
+  }
+  document.getElementById('dayModal').classList.add('open');
+}
+function closeDayModal() { document.getElementById('dayModal').classList.remove('open'); }
+
+async function saveDay() {
+  const label = document.getElementById('dayLabel').value.trim();
+  if (!label) { alert('ラベルを入力してください'); return; }
+  if (editDayId) {
+    const day = S.days.find(d => d.id === editDayId);
+    day.label  = label;
+    day.date   = document.getElementById('dayDate').value.trim();
+    day.title  = document.getElementById('dayTitle').value.trim();
+    day.hotel  = document.getElementById('dayHotel').value.trim();
+    day.color  = document.getElementById('dayColor').value;
+  } else {
+    S.days.push({
+      id:     'day_' + Date.now(),
+      label,
+      date:   document.getElementById('dayDate').value.trim(),
+      title:  document.getElementById('dayTitle').value.trim(),
+      hotel:  document.getElementById('dayHotel').value.trim(),
+      color:  document.getElementById('dayColor').value,
+      events: [],
+    });
+  }
+  closeDayModal();
+  renderItn();
+  await saveState();
+}
+
+async function deleteDay() {
+  if (!confirm(`「${S.days.find(d=>d.id===editDayId)?.label}」を削除しますか？`)) return;
+  S.days = S.days.filter(d => d.id !== editDayId);
+  closeDayModal();
+  renderItn();
+  await saveState();
+}
+
+/* ── Event Modal ── */
+function openEvModal(dayId, evId) {
+  editEvDayId = dayId;
+  editEvId    = evId;
+  if (evId) {
+    const day = S.days.find(d => d.id === dayId);
+    const ev  = day.events.find(e => e.id === evId);
+    document.getElementById('evModalTitle').textContent = 'イベントを編集';
+    document.getElementById('evTime').value = ev.time  || '';
+    document.getElementById('evType').value = ev.type  || 'sight';
+    document.getElementById('evName').value = ev.name  || '';
+    document.getElementById('evAddr').value = ev.addr  || '';
+    document.getElementById('evUrl').value  = ev.url   || '';
+    document.getElementById('evNote').value = ev.note  || '';
+    document.getElementById('evDelBtn').style.display = '';
+  } else {
+    document.getElementById('evModalTitle').textContent = 'イベントを追加';
+    document.getElementById('evTime').value = '';
+    document.getElementById('evType').value = 'sight';
+    document.getElementById('evName').value = '';
+    document.getElementById('evAddr').value = '';
+    document.getElementById('evUrl').value  = '';
+    document.getElementById('evNote').value = '';
+    document.getElementById('evDelBtn').style.display = 'none';
+  }
+  document.getElementById('evModal').classList.add('open');
+}
+function closeEvModal() { document.getElementById('evModal').classList.remove('open'); }
+
+async function saveEv() {
+  const name = document.getElementById('evName').value.trim();
+  if (!name) { alert('名前を入力してください'); return; }
+  const day = S.days.find(d => d.id === editEvDayId);
+  const ev = {
+    id:   editEvId || 'ev_' + Date.now(),
+    time: document.getElementById('evTime').value.trim(),
+    type: document.getElementById('evType').value,
+    name,
+    addr: document.getElementById('evAddr').value.trim(),
+    url:  document.getElementById('evUrl').value.trim(),
+    note: document.getElementById('evNote').value.trim(),
+  };
+  if (editEvId) {
+    const idx = day.events.findIndex(e => e.id === editEvId);
+    day.events[idx] = ev;
+  } else {
+    day.events.push(ev);
+  }
+  // 時間順ソート
+  day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+  const targetDayId = editEvDayId;
+  closeEvModal();
+  renderItn();
+  // タイムラインを開いておく
+  setTimeout(() => {
+    const tl   = document.getElementById('tl_' + targetDayId);
+    const chev = document.getElementById('chev_' + targetDayId);
+    if (tl && !tl.classList.contains('open')) {
+      tl.classList.add('open');
+      if (chev) chev.classList.add('open');
+    }
+  }, 50);
+  await saveState();
+}
+
+async function deleteEv() {
+  const day = S.days.find(d => d.id === editEvDayId);
+  if (!confirm(`「${day.events.find(e=>e.id===editEvId)?.name}」を削除しますか？`)) return;
+  day.events = day.events.filter(e => e.id !== editEvId);
+  closeEvModal();
+  renderItn();
+  await saveState();
+}
+
+// ══════════════════════════════════════════════════════
+//  MEMO
+// ══════════════════════════════════════════════════════
+let editMemoId = null;
+const MEMO_COLOR_MAP = { ocean: '', coral: ' c-coral', leaf: ' c-leaf', sun: ' c-sun' };
+
+function renderMemos() {
+  const l = document.getElementById('memoList');
+  if (!S.memos || !S.memos.length) {
+    l.innerHTML = `<div class="memo-empty">
+      <div class="memo-empty-icon">📄</div>
+      <div class="memo-empty-text">メモはまだありません</div>
+      <div class="memo-empty-hint">右上の「＋ 追加」から作成できます</div>
+    </div>`;
+    return;
+  }
+  l.innerHTML = S.memos.map(m => `
+    <div class="memo-card${MEMO_COLOR_MAP[m.color] || ''}" onclick="openMemoModal('${m.id}')">
+      <div class="memo-card-title">${m.title || '（無題）'}</div>
+      <div class="memo-card-body">${m.body || ''}</div>
+      <div class="memo-card-meta">${new Date(m.updatedAt).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+  `).join('');
+}
+
+function openMemoModal(id) {
+  editMemoId = id || null;
+  if (id) {
+    const m = S.memos.find(x => x.id === id);
+    document.getElementById('memoModalTitle').textContent = 'メモを編集';
+    document.getElementById('memoTitleIn').value   = m.title || '';
+    document.getElementById('memoBodyIn').value    = m.body  || '';
+    document.getElementById('memoColorIn').value   = m.color || 'ocean';
+    document.getElementById('memoDelBtn').style.display = '';
+  } else {
+    document.getElementById('memoModalTitle').textContent = 'メモを追加';
+    document.getElementById('memoTitleIn').value   = '';
+    document.getElementById('memoBodyIn').value    = '';
+    document.getElementById('memoColorIn').value   = 'ocean';
+    document.getElementById('memoDelBtn').style.display = 'none';
+  }
+  document.getElementById('memoModal').classList.add('open');
+}
+function closeMemoModal() { document.getElementById('memoModal').classList.remove('open'); }
+
+async function saveMemo() {
+  const title = document.getElementById('memoTitleIn').value.trim();
+  const body  = document.getElementById('memoBodyIn').value.trim();
+  if (!title && !body) return;
+  const now = Date.now();
+  if (editMemoId) {
+    const m = S.memos.find(x => x.id === editMemoId);
+    m.title     = title;
+    m.body      = body;
+    m.color     = document.getElementById('memoColorIn').value;
+    m.updatedAt = now;
+  } else {
+    S.memos.unshift({
+      id:        'm_' + now,
+      title,
+      body,
+      color:     document.getElementById('memoColorIn').value,
+      updatedAt: now,
+    });
+  }
+  closeMemoModal();
+  renderMemos();
+  await saveState();
+}
+
+async function deleteMemo() {
+  if (!confirm('このメモを削除しますか？')) return;
+  S.memos = S.memos.filter(x => x.id !== editMemoId);
+  closeMemoModal();
+  renderMemos();
+  await saveState();
+}
+
+// ══════════════════════════════════════════════════════
+//  PACKING
+// ══════════════════════════════════════════════════════
+let packFlt = 'all';
+let packQ   = '';
+
+function packFilter(f) {
+  packFlt = f;
+  ['All', 'Unchecked', 'Checked'].forEach(x => {
+    document.getElementById('pb' + x).classList.toggle('active', f === x.toLowerCase());
+  });
+  renderPack();
+}
+function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
+
+async function packReset() {
+  if (!ME) { alert('名前を設定してください'); return; }
+  if (!confirm('自分のチェックをすべてリセットしますか？')) return;
+  Object.keys(S.packChecked).forEach(id => {
+    if (S.packChecked[id] && typeof S.packChecked[id] === 'object') {
+      delete S.packChecked[id][ME];
+      if (Object.keys(S.packChecked[id]).length === 0) delete S.packChecked[id];
+    }
+  });
+  renderPack(); await saveState();
+}
+
+async function togglePack(itemId) {
+  if (!ME) {
+    document.getElementById('nameGateOverlay').classList.remove('hidden');
+    return;
+  }
+  if (!S.packChecked[itemId]) S.packChecked[itemId] = {};
+  const current = !!S.packChecked[itemId][ME];
+  if (current) {
+    delete S.packChecked[itemId][ME];
+    if (Object.keys(S.packChecked[itemId]).length === 0) delete S.packChecked[itemId];
+  } else {
+    S.packChecked[itemId][ME] = true;
+    confetti();
+  }
+  renderPack(); await saveState();
+}
+
+async function deletePackItem(itemId, e) {
+  e.stopPropagation();
+  if (!confirm('このアイテムを削除しますか？')) return;
+  S.packDeleted[itemId] = true;
+  delete S.packChecked[itemId];
+  renderPack(); await saveState();
+}
+
+function allUsers() {
+  // S.users に登録されている全ユーザー名のリスト（表示順は名前順）
+  if (!S.users) return ME ? [ME] : [];
+  const names = Object.values(S.users)
+    .filter(u => u && u.name)
+    .map(u => u.name);
+  // 自分が未登録でも含める
+  if (ME && !names.includes(ME)) names.push(ME);
+  return [...new Set(names)].sort();
+}
+
+function renderPack() {
+  const c = document.getElementById('packContainer');
+  c.innerHTML = '';
+  let total = 0, allDoneCount = 0, mineCount = 0;
+  const users = allUsers();
+
+  // 参加者チップ
+  const pu = document.getElementById('packUsers');
+  if (pu) {
+    pu.innerHTML = users.length
+      ? '<span style="font-size:12px;color:var(--mid);margin-right:4px">参加者：</span>' +
+        users.map(u => {
+          const col = userColor(u), isMe = u === ME;
+          return `<div class="pack-user-chip" style="${isMe ? 'border-color:'+col+';background:'+col+'18' : ''}"><span class="pu-dot" style="background:${col}"></span><span class="pu-name" style="${isMe ? 'color:'+col : ''}">${u}${isMe ? ' (自分)' : ''}</span></div>`;
+        }).join('')
+      : '';
+  }
+
+  DEFAULT_PACK.forEach(sec => {
+    const activeItems = sec.items.filter(item => !S.packDeleted[item.id]);
+    let secAllDone = 0;
+    const rows = activeItems.map(item => {
+      const chkObj = (S.packChecked[item.id] && typeof S.packChecked[item.id] === 'object') ? S.packChecked[item.id] : {};
+      const checkers = Object.keys(chkObj).filter(n => chkObj[n]);
+      const isMine = checkers.includes(ME);
+      const isAll  = users.length > 0 && users.every(u => checkers.includes(u));
+      total++; if (isAll) allDoneCount++; if (isMine) mineCount++; if (isAll) secAllDone++;
+      const matchQ = !packQ || item.name.toLowerCase().includes(packQ) || (item.note || '').toLowerCase().includes(packQ);
+      const matchF = packFlt === 'all' || (packFlt === 'checked' && isAll) || (packFlt === 'unchecked' && !isAll);
+      return { item, checkers, isMine, isAll, vis: matchQ && matchF };
+    });
+    if (!rows.some(r => r.vis)) return;
+
+    const secAllChecked = activeItems.length > 0 && secAllDone === activeItems.length;
+    const wrap = document.createElement('div');
+    wrap.className = 'psec';
+    wrap.innerHTML = `
+      <div class="psec-hdr" onclick="togglePSec('pl_${sec.id}', this)">
+        <span class="psec-icon">${sec.icon}</span>
+        <span class="psec-name">${sec.name}</span>
+        <span class="psec-count${secAllChecked ? ' all-done' : ''}">${secAllDone}/${activeItems.length}</span>
+        <span class="psec-chev open">▼</span>
+      </div>
+      <div class="pitems-list" id="pl_${sec.id}">
+        ${rows.map(({ item, checkers, isMine, isAll, vis }) => {
+          const myCol = ME ? userColor(ME) : '#0A6880';
+          let chips = '';
+          if (users.length) {
+            chips = users.map(u => {
+              const done = checkers.includes(u), uc = userColor(u), isM = u === ME;
+              const st = done ? 'background:'+uc+';border-color:'+uc : (isM ? 'border-color:'+uc+';color:'+uc : '');
+              const oc = isM ? `event.stopPropagation();togglePack('${item.id}')` : 'event.stopPropagation()';
+              return `<span class="pcheck-chip${isM?' mine-chip':''} ${done?'done':''}" style="${st}" onclick="${oc}">${done?'✓ ':''}${u}</span>`;
+            }).join('');
+          } else if (ME) {
+            const st = isMine ? 'background:'+myCol+';border-color:'+myCol : 'border-color:'+myCol+';color:'+myCol;
+            chips = `<span class="pcheck-chip mine-chip ${isMine?'done':''}" style="${st}" onclick="event.stopPropagation();togglePack('${item.id}')">${isMine?'✓ ':''}${ME}（タップでチェック）</span>`;
+          } else {
+            chips = '<span style="font-size:11px;color:#aac0c8">名前を設定するとチェックできます</span>';
+          }
+          return `<div class="pitem${isAll?' checked':''}${!vis?' hidden':''}" onclick="togglePack('${item.id}')">
+            <span class="pdot ${item.p||'low'}"></span>
+            <div class="pbody">
+              <div class="pname"${isAll?' style="color:#94a3a8;text-decoration:line-through"':''}>${item.name}</div>
+              ${item.note?`<div class="pnote">${item.note}</div>`:''}
+              <div class="pitem-checks">${chips}</div>
+            </div>
+            <button class="pdel-btn" onclick="deletePackItem('${item.id}', event)" title="削除">✕</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+    c.appendChild(wrap);
+  });
+
+  document.getElementById('pTotal').textContent = total;
+  document.getElementById('pDone').textContent  = allDoneCount;
+  document.getElementById('pLeft').textContent  = mineCount;
+  const pct = total ? Math.round(mineCount / total * 100) : 0;
+  document.getElementById('heroBar').style.width = pct + '%';
+  document.getElementById('heroLbl').textContent = `自分の準備 ${mineCount} / ${total} 完了`;
+}
+
+// ══════════════════════════════════════════════════════
+//  PACK SECTION TOGGLE
+// ══════════════════════════════════════════════════════
+function togglePSec(listId, hdr) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const chev = hdr.querySelector('.psec-chev');
+  const isOpen = list.style.display !== 'none' && list.style.display !== '';
+  list.style.display = isOpen ? 'none' : 'block';
+  hdr.classList.toggle('collapsed', isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL HELPERS
+// ══════════════════════════════════════════════════════
+function overlayClose(e, id) {
+  if (e.target === e.currentTarget) {
+    document.getElementById(id).classList.remove('open');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  CONFETTI
+// ══════════════════════════════════════════════════════
+function confetti() {
+  const w = document.getElementById('cfwrap');
+  const cols = ['#0A6880','#E86B4E','#D4A017','#3A7D44','#1597B8'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'cfp';
+    el.style.cssText = `
+      left: ${Math.random() * 100}%;
+      top: -12px;
+      background: ${cols[Math.floor(Math.random() * cols.length)]};
+      animation-duration: ${0.9 + Math.random() * 0.9}s;
+      animation-delay: ${Math.random() * 0.3}s;
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    w.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  REALTIME — 他のタブ・ユーザーの変更をリアルタイム反映
+//  自分の保存（isSaving=true）中は無視して二重レンダリングを防ぐ
+// ══════════════════════════════════════════════════════
+db.channel('trip_plans_realtime')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'trip_plans', filter: `share_code=eq.${shareCode}` },
+    async (payload) => {
+      if (isSaving) return; // 自分の保存によるイベントは無視
+      if (payload.new && payload.new.data) {
+        const d = payload.new.data;
+        S = {
+          days:        Array.isArray(d.days)        ? d.days        : [],
+          memos:       Array.isArray(d.memos)       ? d.memos       : [],
+          packChecked: d.packChecked && typeof d.packChecked === 'object' ? d.packChecked : {},
+          packDeleted: d.packDeleted && typeof d.packDeleted === 'object' ? d.packDeleted : {},
+          users:       d.users       && typeof d.users       === 'object' ? d.users       : {},
+        };
+        renderAll();
+        restoreMe();
+        showHeroUser();
+        showSync('同期しました ↻');
+      }
+    }
+  )
+  .subscribe();
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+(async () => {
+  await loadState();
+
+  // DBから自分の名前を復元
+  restoreMe();
+
+  // 名前が既にあればゲートをスキップ
+  if (ME) {
+    document.getElementById('nameGateOverlay').classList.add('hidden');
+    showHeroUser();
+  }
+
+  renderAll();
+
+  // ヒントカードを表示（キャッシュ優先、なければAPI呼び出し）
+  fetchHint(false);
+
+  // ローディング画面を非表示
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500);
+})();
+
+// ══════════════════════════════════════════════════════
+//  AI ENDPOINT（Vercel環境では /api/ai、それ以外は直接）
+// ══════════════════════════════════════════════════════
+const AI_ENDPOINT = location.hostname === 'localhost' || location.hostname.includes('vercel.app') || location.protocol === 'file:'
+  ? '/api/ai'
+  : 'https://api.anthropic.com/v1/messages';
+const AI_DIRECT = !AI_ENDPOINT.startsWith('/');
+
+async function callAI({ system, userMsg, maxTokens = 512 }) {
+  if (AI_DIRECT) {
+    // Artifact内（直接呼び出し）
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: Math.min(maxTokens, 1024), // 上限を念のため制限
-        system: system || '',
+        max_tokens: maxTokens,
+        system,
         messages: [{ role: 'user', content: userMsg }],
       }),
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Anthropic API error:', data);
-      return res.status(response.status).json({ error: data?.error?.message || 'API error' });
-    }
-
-    const text = data?.content?.[0]?.text || '';
-    return res.status(200).json({ text });
-
-  } catch (err) {
-    console.error('Server error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    const data = await res.json();
+    return data?.content?.[0]?.text || '';
+  } else {
+    // Vercel API Route経由
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, userMsg, maxTokens }),
+    });
+    const data = await res.json();
+    return data?.text || '';
   }
 }
+
+// ══════════════════════════════════════════════════════
+//  AI HINT（ヒントカード：数時間キャッシュ）
+// ══════════════════════════════════════════════════════
+const HINT_CACHE_KEY   = 'ai_hint_cache';
+const HINT_CACHE_HOURS = 4; // 4時間ごとに更新
+
+const HINT_ICONS = ['✈️','🌺','🏖️','🌊','🧳','🗓️','💡','☀️','🤿','📍'];
+
+function hintCacheValid() {
+  try {
+    const c = JSON.parse(localStorage.getItem(HINT_CACHE_KEY) || '{}');
+    if (!c.text || !c.ts) return null;
+    const age = (Date.now() - c.ts) / 3600000; // 時間
+    return age < HINT_CACHE_HOURS ? c : null;
+  } catch { return null; }
+}
+
+function hintCacheSave(text, icon) {
+  localStorage.setItem(HINT_CACHE_KEY, JSON.stringify({ text, icon, ts: Date.now() }));
+}
+
+async function fetchHint(force = false) {
+  const card = document.getElementById('hintCard');
+  const textEl = document.getElementById('hintText');
+  const iconEl = document.getElementById('hintIcon');
+  const refreshBtn = document.getElementById('hintRefreshBtn');
+
+  // キャッシュが有効で強制更新でなければそれを使う
+  if (!force) {
+    const cached = hintCacheValid();
+    if (cached) {
+      card.style.display = 'flex';
+      textEl.textContent = cached.text;
+      iconEl.textContent = cached.icon || '✨';
+      return;
+    }
+  }
+
+  // ローディング
+  card.style.display = 'flex';
+  textEl.innerHTML = '<div class="hint-skeleton"></div><div class="hint-skeleton short"></div>';
+  refreshBtn.classList.add('spin');
+  setTimeout(() => refreshBtn.classList.remove('spin'), 400);
+
+  // コンテキスト生成（軽量版）
+  const today = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  const firstDay = S.days && S.days[0];
+  let daysUntil = '';
+  if (firstDay?.date) {
+    const m = firstDay.date.match(/(\d+)月(\d+)日/);
+    if (m) {
+      const dep = new Date(new Date().getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+      const diff = Math.ceil((dep - new Date()) / 86400000);
+      daysUntil = diff > 0 ? `出発まであと${diff}日` : diff === 0 ? '今日が出発日！' : '旅行中';
+    }
+  }
+  const uncheckedCount = DEFAULT_PACK.flatMap(s => s.items)
+    .filter(item => !S.packDeleted?.[item.id] && !(S.packChecked?.[item.id]?.[ME])).length;
+
+  const system = `あなたはハワイ旅行のAIアシスタントです。今日は${today}。${daysUntil ? daysUntil+'。' : ''}${ME ? 'ユーザー名は'+ME+'。' : ''}未チェックの持ち物が${uncheckedCount}件あります。旅程：${(S.days||[]).map(d=>d.label+' '+d.date).join('、') || 'なし'}。
+
+旅行の準備・当日・ハワイ現地に関する短いヒントや励ましのメッセージを1文（30〜50字程度）で返してください。絵文字は使わず、テキストのみで。毎回違う観点から。`;
+
+  try {
+    const text = await callAI({ system, userMsg: 'ヒントをください', maxTokens: 120 });
+    if (text) {
+      const icon = HINT_ICONS[Math.floor(Math.random() * HINT_ICONS.length)];
+      hintCacheSave(text.trim(), icon);
+      textEl.textContent = text.trim();
+      iconEl.textContent = icon;
+    } else {
+      textEl.textContent = '旅行の準備を少しずつ進めていきましょう！';
+    }
+  } catch {
+    textEl.textContent = '旅行の準備を少しずつ進めていきましょう！';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  AI CHAT
+// ══════════════════════════════════════════════════════
+const AI_DAILY_LIMIT  = 10;   // 1日あたりの上限
+const AI_COOLDOWN_SEC = 30;   // 連続送信クールダウン（秒）
+
+let aiDrawerOpen  = false;
+let aiSending     = false;
+let aiCdRemaining = 0;
+let aiCdTimer     = null;
+
+// ── 使用回数（localStorage で今日だけカウント）──
+function aiTodayKey() {
+  return 'ai_used_' + new Date().toISOString().slice(0, 10); // "ai_used_2025-06-07"
+}
+function aiUsedToday() {
+  return parseInt(localStorage.getItem(aiTodayKey()) || '0', 10);
+}
+function aiIncrUsed() {
+  localStorage.setItem(aiTodayKey(), aiUsedToday() + 1);
+}
+function aiRemaining() {
+  return Math.max(0, AI_DAILY_LIMIT - aiUsedToday());
+}
+function aiUpdateLimitUI() {
+  const rem = aiRemaining();
+  document.getElementById('aiRemain').textContent = rem;
+  // クールダウン中の表示
+  const cdEl = document.getElementById('aiCdText');
+  if (aiCdRemaining > 0) {
+    cdEl.style.display = '';
+    cdEl.textContent = `${aiCdRemaining}秒待機中`;
+  } else {
+    cdEl.style.display = 'none';
+  }
+  // ボタン制御
+  const disabled = aiSending || aiCdRemaining > 0 || rem === 0;
+  document.getElementById('aiSendBtn').disabled = disabled;
+  document.querySelectorAll('.ai-quick').forEach(b => b.disabled = disabled);
+}
+
+// ── クールダウン開始 ──
+function aiStartCooldown() {
+  aiCdRemaining = AI_COOLDOWN_SEC;
+  aiUpdateLimitUI();
+  clearInterval(aiCdTimer);
+  aiCdTimer = setInterval(() => {
+    aiCdRemaining = Math.max(0, aiCdRemaining - 1);
+    aiUpdateLimitUI();
+    if (aiCdRemaining === 0) clearInterval(aiCdTimer);
+  }, 1000);
+}
+
+// ── Drawer 開閉 ──
+function toggleAiDrawer() {
+  aiDrawerOpen = !aiDrawerOpen;
+  document.getElementById('aiDrawer').classList.toggle('open', aiDrawerOpen);
+  document.getElementById('aiBadge').classList.remove('show');
+  if (aiDrawerOpen) {
+    aiUpdateLimitUI();
+    setTimeout(() => document.getElementById('aiInput').focus(), 350);
+  }
+}
+
+// ── メッセージ追加 ──
+function aiAddMsg(role, text, loading = false) {
+  const wrap = document.getElementById('aiMsgs');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + (role === 'user' ? 'user' : 'bot') + (loading ? ' loading' : '');
+  const avatarHtml = role === 'user'
+    ? `<div class="ai-avatar usr">${ME ? ME[0].toUpperCase() : '?'}</div>`
+    : `<div class="ai-avatar bot">✨</div>`;
+  div.innerHTML = `${avatarHtml}<div class="ai-bubble">${text}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+// ── コンテキスト生成（旅程・持ち物をAPIに渡す）──
+function aiContext() {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  // 旅程サマリー
+  const itinLines = (S.days || []).map(day => {
+    const evs = (day.events || []).map(ev => `  ${ev.time||''} ${ev.name}${ev.addr?' ('+ev.addr+')':''}`).join('\n');
+    return `【${day.label} ${day.date}】${day.title||''}\n${evs || '  （イベントなし）'}`;
+  }).join('\n');
+
+  // 出発日（最初のdayのdateを使う）
+  const firstDay = S.days && S.days[0];
+  let daysUntil = '不明';
+  if (firstDay && firstDay.date) {
+    // "6月6日（金）" のような形式から数値を抽出して比較
+    const m = firstDay.date.match(/(\d+)月(\d+)日/);
+    if (m) {
+      const dep = new Date(today.getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+      const diff = Math.ceil((dep - today) / 86400000);
+      daysUntil = diff > 0 ? `${diff}日後` : diff === 0 ? '今日！' : `${Math.abs(diff)}日前（旅行中）`;
+    }
+  }
+
+  // 未チェック持ち物（自分のMEが未チェックのもの）
+  const unchecked = [];
+  (DEFAULT_PACK || []).forEach(sec => {
+    sec.items.forEach(item => {
+      if (S.packDeleted && S.packDeleted[item.id]) return;
+      const chkObj = S.packChecked && S.packChecked[item.id];
+      const isMineChecked = chkObj && typeof chkObj === 'object' && chkObj[ME];
+      if (!isMineChecked) unchecked.push(`${item.name}（${sec.name}）`);
+    });
+  });
+
+  // 参加者
+  const members = Object.values(S.users || {}).map(u => u.name).filter(Boolean).join('、') || '未設定';
+
+  return `あなたはハワイ旅行専用のAIアシスタントです。以下の情報を元に、ユーザーの質問に日本語で簡潔・親切に答えてください。
+
+■ 今日の日付：${todayStr}
+■ 出発まで：${daysUntil}
+■ 参加者：${members}
+■ 質問しているユーザー：${ME || '不明'}
+
+■ 旅程：
+${itinLines || '（未設定）'}
+
+■ ${ME || '自分'}の未チェック持ち物（${unchecked.length}件）：
+${unchecked.length ? unchecked.slice(0, 20).join('\n') + (unchecked.length > 20 ? `\n…他${unchecked.length-20}件` : '') : '（すべて完了！）'}
+
+注意：旅行データに基づいて正確に答えてください。不明な情報は「データにありません」と素直に伝えてください。返答は3〜5文程度にまとめてください。`;
+}
+
+// ── クイックボタン ──
+function aiQuick(text) {
+  document.getElementById('aiInput').value = text;
+  aiSend();
+}
+
+// ── 送信 ──
+async function aiSend() {
+  const input = document.getElementById('aiInput');
+  const text = input.value.trim();
+  if (!text || aiSending || aiCdRemaining > 0) return;
+  if (aiRemaining() <= 0) {
+    aiAddMsg('bot', '本日の利用上限（10回）に達しました。明日また話しかけてください🌺');
+    return;
+  }
+
+  // 送信中フラグ
+  aiSending = true;
+  input.value = '';
+  aiUpdateLimitUI();
+
+  // ユーザーのメッセージを表示
+  aiAddMsg('user', text);
+
+  // ローディング表示
+  const loadingDiv = aiAddMsg('bot', '考え中…', true);
+
+  try {
+    const reply = await callAI({
+      system: aiContext(),
+      userMsg: text,
+      maxTokens: 1000,
+    });
+
+    const finalReply = reply || 'うまく取得できませんでした。もう一度試してください。';
+
+    // ローディングを実際の返答に置き換え
+    loadingDiv.classList.remove('loading');
+    loadingDiv.querySelector('.ai-bubble').textContent = finalReply;
+    document.getElementById('aiMsgs').scrollTop = document.getElementById('aiMsgs').scrollHeight;
+
+    // 使用回数カウント＆クールダウン開始
+    aiIncrUsed();
+    aiStartCooldown();
+
+    // Drawer が閉じているときはバッジを表示
+    if (!aiDrawerOpen) {
+      document.getElementById('aiBadge').textContent = '!';
+      document.getElementById('aiBadge').classList.add('show');
+    }
+  } catch (e) {
+    console.error('AI error:', e);
+    loadingDiv.classList.remove('loading');
+    loadingDiv.querySelector('.ai-bubble').textContent = 'エラーが発生しました。ネットワークを確認してください。';
+  } finally {
+    aiSending = false;
+    aiUpdateLimitUI();
+  }
+}
+
+
+</script>
+</body>
+</html>
