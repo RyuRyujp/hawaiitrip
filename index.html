@@ -876,6 +876,114 @@ body {
 .pcheck-chip.done { color: #fff; }
 .pcheck-chip.mine-chip { cursor: pointer; }
 .pcheck-chip.mine-chip:hover { opacity: .85; }
+
+/* ─── AI CHAT ─── */
+.ai-fab {
+  position: fixed; bottom: 24px; right: 20px; z-index: 400;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #0A6880, #1597B8);
+  border: none; color: #fff; font-size: 24px; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(10,104,128,.4);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s, box-shadow .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ai-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(10,104,128,.5); }
+.ai-fab .ai-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--coral); color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 100px; padding: 1px 5px; min-width: 18px; text-align: center;
+  display: none;
+}
+.ai-fab .ai-badge.show { display: block; }
+
+.ai-drawer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 450;
+  background: #fff; border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.15);
+  display: flex; flex-direction: column;
+  max-height: 85vh; height: 520px;
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.32,1,.36,1);
+}
+.ai-drawer.open { transform: translateY(0); }
+.ai-drawer-handle {
+  width: 40px; height: 5px; background: #d0dde3; border-radius: 3px;
+  margin: 12px auto 0; flex-shrink: 0;
+}
+.ai-drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px 10px; flex-shrink: 0;
+}
+.ai-drawer-title { font-size: 16px; font-weight: 700; color: var(--ocean); display: flex; align-items: center; gap: 7px; }
+.ai-drawer-close {
+  width: 32px; height: 32px; border: none; background: var(--sky);
+  border-radius: 50%; font-size: 16px; cursor: pointer; color: var(--mid);
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.ai-limit-bar {
+  margin: 0 18px 8px; padding: 6px 10px; background: var(--sky);
+  border-radius: 8px; font-size: 11px; color: var(--mid);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.ai-limit-used { font-weight: 700; color: var(--ocean); }
+.ai-limit-cd { color: var(--coral); font-weight: 700; }
+
+.ai-msgs {
+  flex: 1; overflow-y: auto; padding: 4px 18px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  scroll-behavior: smooth;
+}
+.ai-msg { display: flex; gap: 8px; align-items: flex-start; }
+.ai-msg.user { flex-direction: row-reverse; }
+.ai-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; margin-top: 2px;
+}
+.ai-avatar.bot { background: linear-gradient(135deg,#0A6880,#1597B8); color: #fff; }
+.ai-avatar.usr { background: var(--sky2); font-size: 12px; }
+.ai-bubble {
+  max-width: 78%; padding: 9px 13px; border-radius: 16px;
+  font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+}
+.ai-msg.bot .ai-bubble { background: var(--sky); color: var(--dark); border-top-left-radius: 4px; }
+.ai-msg.user .ai-bubble { background: var(--ocean); color: #fff; border-top-right-radius: 4px; }
+.ai-msg.bot.loading .ai-bubble { color: var(--mid); font-style: italic; }
+
+.ai-quick-wrap {
+  padding: 0 18px 8px; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0;
+}
+.ai-quick {
+  font-family: inherit; font-size: 12px; padding: 6px 12px;
+  border: 1.5px solid var(--border); border-radius: 100px;
+  background: #fff; color: var(--ocean); cursor: pointer;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.ai-quick:hover { background: var(--sky); border-color: var(--ocean2); }
+.ai-quick:disabled { opacity: .45; cursor: not-allowed; }
+
+.ai-input-row {
+  display: flex; gap: 8px; padding: 10px 18px 20px; flex-shrink: 0;
+  border-top: 1px solid var(--sky2);
+}
+.ai-input {
+  flex: 1; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: 100px; font-family: inherit; font-size: 14px;
+  color: var(--dark); outline: none; transition: border-color .2s;
+  background: var(--sky);
+}
+.ai-input:focus { border-color: var(--ocean2); background: #fff; }
+.ai-send {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--ocean); border: none; color: #fff;
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s; -webkit-tap-highlight-color: transparent;
+}
+.ai-send:hover { background: var(--ocean2); }
+.ai-send:disabled { background: #aac0c8; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -1099,6 +1207,41 @@ body {
 </div>
 
 <div class="cfwrap" id="cfwrap"></div>
+
+<!-- AI CHAT FAB -->
+<button class="ai-fab" id="aiFab" onclick="toggleAiDrawer()">
+  🤖<span class="ai-badge" id="aiBadge"></span>
+</button>
+
+<!-- AI CHAT DRAWER -->
+<div class="ai-drawer" id="aiDrawer">
+  <div class="ai-drawer-handle"></div>
+  <div class="ai-drawer-head">
+    <div class="ai-drawer-title">✨ AIアシスタント</div>
+    <button class="ai-drawer-close" onclick="toggleAiDrawer()">✕</button>
+  </div>
+  <div class="ai-limit-bar">
+    <span>本日の残り：<span class="ai-limit-used" id="aiRemain">10</span>回</span>
+    <span class="ai-limit-cd" id="aiCdText" style="display:none"></span>
+  </div>
+  <div class="ai-msgs" id="aiMsgs">
+    <div class="ai-msg bot">
+      <div class="ai-avatar bot">✨</div>
+      <div class="ai-bubble">こんにちは！旅行の準備や予定について何でも聞いてください🌺</div>
+    </div>
+  </div>
+  <div class="ai-quick-wrap" id="aiQuicks">
+    <button class="ai-quick" onclick="aiQuick('あと何日で出発？')">あと何日？</button>
+    <button class="ai-quick" onclick="aiQuick('今日の予定を教えて')">今日の予定</button>
+    <button class="ai-quick" onclick="aiQuick('まだ準備できていない持ち物は？')">未準備チェック</button>
+    <button class="ai-quick" onclick="aiQuick('旅行までにやるべきことは？')">やること整理</button>
+  </div>
+  <div class="ai-input-row">
+    <input class="ai-input" id="aiInput" placeholder="メッセージを入力…" autocomplete="off"
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}">
+    <button class="ai-send" id="aiSendBtn" onclick="aiSend()">➤</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1889,10 +2032,205 @@ db.channel('trip_plans_realtime')
   setTimeout(() => overlay.remove(), 500);
 })();
 
-// nameGateInputのEnterキー対応
-document.getElementById('nameGateInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') submitName();
-});
+// ══════════════════════════════════════════════════════
+//  AI CHAT
+// ══════════════════════════════════════════════════════
+const AI_DAILY_LIMIT  = 10;   // 1日あたりの上限
+const AI_COOLDOWN_SEC = 30;   // 連続送信クールダウン（秒）
+
+let aiDrawerOpen  = false;
+let aiSending     = false;
+let aiCdRemaining = 0;
+let aiCdTimer     = null;
+
+// ── 使用回数（localStorage で今日だけカウント）──
+function aiTodayKey() {
+  return 'ai_used_' + new Date().toISOString().slice(0, 10); // "ai_used_2025-06-07"
+}
+function aiUsedToday() {
+  return parseInt(localStorage.getItem(aiTodayKey()) || '0', 10);
+}
+function aiIncrUsed() {
+  localStorage.setItem(aiTodayKey(), aiUsedToday() + 1);
+}
+function aiRemaining() {
+  return Math.max(0, AI_DAILY_LIMIT - aiUsedToday());
+}
+function aiUpdateLimitUI() {
+  const rem = aiRemaining();
+  document.getElementById('aiRemain').textContent = rem;
+  // クールダウン中の表示
+  const cdEl = document.getElementById('aiCdText');
+  if (aiCdRemaining > 0) {
+    cdEl.style.display = '';
+    cdEl.textContent = `${aiCdRemaining}秒待機中`;
+  } else {
+    cdEl.style.display = 'none';
+  }
+  // ボタン制御
+  const disabled = aiSending || aiCdRemaining > 0 || rem === 0;
+  document.getElementById('aiSendBtn').disabled = disabled;
+  document.querySelectorAll('.ai-quick').forEach(b => b.disabled = disabled);
+}
+
+// ── クールダウン開始 ──
+function aiStartCooldown() {
+  aiCdRemaining = AI_COOLDOWN_SEC;
+  aiUpdateLimitUI();
+  clearInterval(aiCdTimer);
+  aiCdTimer = setInterval(() => {
+    aiCdRemaining = Math.max(0, aiCdRemaining - 1);
+    aiUpdateLimitUI();
+    if (aiCdRemaining === 0) clearInterval(aiCdTimer);
+  }, 1000);
+}
+
+// ── Drawer 開閉 ──
+function toggleAiDrawer() {
+  aiDrawerOpen = !aiDrawerOpen;
+  document.getElementById('aiDrawer').classList.toggle('open', aiDrawerOpen);
+  document.getElementById('aiBadge').classList.remove('show');
+  if (aiDrawerOpen) {
+    aiUpdateLimitUI();
+    setTimeout(() => document.getElementById('aiInput').focus(), 350);
+  }
+}
+
+// ── メッセージ追加 ──
+function aiAddMsg(role, text, loading = false) {
+  const wrap = document.getElementById('aiMsgs');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + (role === 'user' ? 'user' : 'bot') + (loading ? ' loading' : '');
+  const avatarHtml = role === 'user'
+    ? `<div class="ai-avatar usr">${ME ? ME[0].toUpperCase() : '?'}</div>`
+    : `<div class="ai-avatar bot">✨</div>`;
+  div.innerHTML = `${avatarHtml}<div class="ai-bubble">${text}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+// ── コンテキスト生成（旅程・持ち物をAPIに渡す）──
+function aiContext() {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  // 旅程サマリー
+  const itinLines = (S.days || []).map(day => {
+    const evs = (day.events || []).map(ev => `  ${ev.time||''} ${ev.name}${ev.addr?' ('+ev.addr+')':''}`).join('\n');
+    return `【${day.label} ${day.date}】${day.title||''}\n${evs || '  （イベントなし）'}`;
+  }).join('\n');
+
+  // 出発日（最初のdayのdateを使う）
+  const firstDay = S.days && S.days[0];
+  let daysUntil = '不明';
+  if (firstDay && firstDay.date) {
+    // "6月6日（金）" のような形式から数値を抽出して比較
+    const m = firstDay.date.match(/(\d+)月(\d+)日/);
+    if (m) {
+      const dep = new Date(today.getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+      const diff = Math.ceil((dep - today) / 86400000);
+      daysUntil = diff > 0 ? `${diff}日後` : diff === 0 ? '今日！' : `${Math.abs(diff)}日前（旅行中）`;
+    }
+  }
+
+  // 未チェック持ち物（自分のMEが未チェックのもの）
+  const unchecked = [];
+  (DEFAULT_PACK || []).forEach(sec => {
+    sec.items.forEach(item => {
+      if (S.packDeleted && S.packDeleted[item.id]) return;
+      const chkObj = S.packChecked && S.packChecked[item.id];
+      const isMineChecked = chkObj && typeof chkObj === 'object' && chkObj[ME];
+      if (!isMineChecked) unchecked.push(`${item.name}（${sec.name}）`);
+    });
+  });
+
+  // 参加者
+  const members = Object.values(S.users || {}).map(u => u.name).filter(Boolean).join('、') || '未設定';
+
+  return `あなたはハワイ旅行専用のAIアシスタントです。以下の情報を元に、ユーザーの質問に日本語で簡潔・親切に答えてください。
+
+■ 今日の日付：${todayStr}
+■ 出発まで：${daysUntil}
+■ 参加者：${members}
+■ 質問しているユーザー：${ME || '不明'}
+
+■ 旅程：
+${itinLines || '（未設定）'}
+
+■ ${ME || '自分'}の未チェック持ち物（${unchecked.length}件）：
+${unchecked.length ? unchecked.slice(0, 20).join('\n') + (unchecked.length > 20 ? `\n…他${unchecked.length-20}件` : '') : '（すべて完了！）'}
+
+注意：旅行データに基づいて正確に答えてください。不明な情報は「データにありません」と素直に伝えてください。返答は3〜5文程度にまとめてください。`;
+}
+
+// ── クイックボタン ──
+function aiQuick(text) {
+  document.getElementById('aiInput').value = text;
+  aiSend();
+}
+
+// ── 送信 ──
+async function aiSend() {
+  const input = document.getElementById('aiInput');
+  const text = input.value.trim();
+  if (!text || aiSending || aiCdRemaining > 0) return;
+  if (aiRemaining() <= 0) {
+    aiAddMsg('bot', '本日の利用上限（10回）に達しました。明日また話しかけてください🌺');
+    return;
+  }
+
+  // 送信中フラグ
+  aiSending = true;
+  input.value = '';
+  aiUpdateLimitUI();
+
+  // ユーザーのメッセージを表示
+  aiAddMsg('user', text);
+
+  // ローディング表示
+  const loadingDiv = aiAddMsg('bot', '考え中…', true);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1000,
+        system: aiContext(),
+        messages: [{ role: 'user', content: text }],
+      }),
+    });
+
+    const data = await res.json();
+    const reply = data?.content?.[0]?.text || 'うまく取得できませんでした。もう一度試してください。';
+
+    // ローディングを実際の返答に置き換え
+    loadingDiv.classList.remove('loading');
+    loadingDiv.querySelector('.ai-bubble').textContent = reply;
+    document.getElementById('aiMsgs').scrollTop = document.getElementById('aiMsgs').scrollHeight;
+
+    // 使用回数カウント＆クールダウン開始
+    aiIncrUsed();
+    aiStartCooldown();
+
+    // Drawer が閉じているときはバッジを表示
+    if (!aiDrawerOpen) {
+      document.getElementById('aiBadge').textContent = '!';
+      document.getElementById('aiBadge').classList.add('show');
+    }
+  } catch (e) {
+    console.error('AI error:', e);
+    loadingDiv.classList.remove('loading');
+    loadingDiv.querySelector('.ai-bubble').textContent = 'エラーが発生しました。ネットワークを確認してください。';
+  } finally {
+    aiSending = false;
+    aiUpdateLimitUI();
+  }
+}
+
+
 </script>
 </body>
 </html>
