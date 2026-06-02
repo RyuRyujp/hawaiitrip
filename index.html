@@ -393,6 +393,30 @@ body {
   margin-top: 3px;
   line-height: 1.55;
 }
+.tl-addr {
+  font-size: 11px;
+  color: var(--mid);
+  margin-top: 4px;
+}
+.tl-links {
+  display: flex;
+  gap: 7px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.tl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ocean2);
+  text-decoration: none;
+  background: var(--sky);
+  padding: 3px 9px;
+  border-radius: 100px;
+  transition: background .15s;
+}
+.tl-link:hover { background: var(--sky2); }
 .tl-edit-btn {
   flex-shrink: 0;
   font-size: 13px;
@@ -772,6 +796,86 @@ body {
   0%   { transform: translateY(-10px) rotate(0);    opacity: 1; }
   100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
 }
+
+/* ─── NAME GATE ─── */
+.name-gate-overlay {
+  position: fixed; inset: 0;
+  background: rgba(22,40,48,.6);
+  z-index: 8000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.name-gate-overlay.hidden { display: none; }
+.name-gate-card {
+  background: #fff; border-radius: 22px; padding: 36px 28px;
+  width: 100%; max-width: 360px; text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,.2);
+}
+.name-gate-icon   { font-size: 48px; margin-bottom: 12px; }
+.name-gate-title  { font-size: 22px; font-weight: 700; color: var(--ocean); margin-bottom: 6px; }
+.name-gate-sub    { font-size: 14px; color: var(--mid); margin-bottom: 20px; }
+.name-gate-input  {
+  width: 100%; padding: 14px; border: 2px solid var(--border);
+  border-radius: 12px; font-size: 18px; text-align: center;
+  outline: none; font-family: inherit; transition: border-color .2s;
+}
+.name-gate-input:focus { border-color: var(--ocean2); }
+.name-gate-btn {
+  margin-top: 14px; width: 100%; padding: 14px;
+  background: var(--ocean); color: #fff; border: none;
+  border-radius: 12px; font-size: 18px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: background .15s;
+}
+.name-gate-btn:hover { background: var(--ocean2); }
+
+/* ─── HERO USER ─── */
+.hero-user-wrap {
+  font-size: 13px; color: rgba(255,255,255,.85);
+  margin-top: 8px; position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.hero-user-badge {
+  background: rgba(255,255,255,.2); border-radius: 100px;
+  padding: 3px 12px; font-weight: 600;
+}
+.hero-user-change {
+  font-size: 11px; color: rgba(255,255,255,.5);
+  cursor: pointer; text-decoration: underline;
+}
+
+/* ─── PACK USER CHIPS ─── */
+.pack-users {
+  display: flex; gap: 8px; margin-bottom: 14px;
+  flex-wrap: wrap; align-items: center;
+}
+.pack-user-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 100px;
+  background: #fff; border: 1.5px solid var(--border);
+  font-size: 12px; color: var(--mid);
+  box-shadow: var(--shadow);
+}
+.pack-user-chip .pu-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pack-user-chip .pu-name { font-weight: 600; }
+
+/* ─── PCHECK CHIPS ─── */
+.pitem-checks {
+  display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px;
+}
+.pcheck-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: 100px;
+  font-size: 11px; font-weight: 600;
+  border: 1.5px solid #dde5e9;
+  background: #f0f4f6; color: #888;
+  transition: all .15s;
+  user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.pcheck-chip.done { color: #fff; }
+.pcheck-chip.mine-chip { cursor: pointer; }
+.pcheck-chip.mine-chip:hover { opacity: .85; }
 </style>
 </head>
 <body>
@@ -780,6 +884,17 @@ body {
 <div class="loading-overlay" id="loadingOverlay">
   <div class="loading-spinner"></div>
   <p class="loading-text">データを読み込み中…</p>
+</div>
+
+<!-- NAME GATE -->
+<div class="name-gate-overlay" id="nameGateOverlay">
+  <div class="name-gate-card">
+    <div class="name-gate-icon">🌺</div>
+    <div class="name-gate-title">Hawaii Trip Planner</div>
+    <div class="name-gate-sub">あなたの名前を入力してください<br>持ち物チェックに使用されます</div>
+    <input class="name-gate-input" id="nameGateInput" placeholder="例：Leo" maxlength="12" autocomplete="off">
+    <button class="name-gate-btn" onclick="submitName()">スタート →</button>
+  </div>
 </div>
 
 <!-- SYNC INDICATOR -->
@@ -791,6 +906,11 @@ body {
   <p class="hero-eyebrow">Hawaii Trip Planner</p>
   <h1 class="hero-title">🌺 Aloha, Hawaii</h1>
   <p class="hero-sub">旅程 · メモ · 持ち物リスト</p>
+  <div class="hero-user-wrap" id="heroUserWrap" style="display:none">
+    <span>ようこそ</span>
+    <span class="hero-user-badge" id="heroUserName"></span>
+    <span class="hero-user-change" onclick="changeName()">変更</span>
+  </div>
   <div class="hero-progress-wrap">
     <div class="hero-progress-track">
       <div class="hero-progress-bar" id="heroBar"></div>
@@ -862,13 +982,14 @@ body {
       </div>
       <div class="pack-stat">
         <div class="pstat-num" id="pDone">0</div>
-        <div class="pstat-lbl">準備完了</div>
+        <div class="pstat-lbl">全員完了</div>
       </div>
       <div class="pack-stat">
         <div class="pstat-num" id="pLeft">0</div>
-        <div class="pstat-lbl">残り</div>
+        <div class="pstat-lbl">自分完了</div>
       </div>
     </div>
+    <div class="pack-users" id="packUsers"></div>
     <div class="legend">
       <span>優先度：</span>
       <span class="legend-item"><span class="ldot" style="background:#E86B4E"></span>必須</span>
@@ -876,9 +997,9 @@ body {
     </div>
     <div class="pack-toolbar">
       <button class="pill active" id="pbAll"       onclick="packFilter('all')">すべて</button>
-      <button class="pill"        id="pbUnchecked"  onclick="packFilter('unchecked')">未チェック</button>
-      <button class="pill"        id="pbChecked"    onclick="packFilter('checked')">完了</button>
-      <button class="pill"                          onclick="packReset()">リセット</button>
+      <button class="pill"        id="pbUnchecked"  onclick="packFilter('unchecked')">未完了</button>
+      <button class="pill"        id="pbChecked"    onclick="packFilter('checked')">全員完了</button>
+      <button class="pill"                          onclick="packReset()">自分リセット</button>
     </div>
     <div class="srch-wrap">
       <span class="srch-icon">🔍</span>
@@ -939,6 +1060,10 @@ body {
     </select>
     <label class="form-label">名前</label>
     <input class="form-input" id="evName" placeholder="例：ダイヤモンドヘッド登山" autocomplete="off">
+    <label class="form-label">📍 住所・場所メモ</label>
+    <input class="form-input" id="evAddr" placeholder="例：Diamond Head Rd, Honolulu, HI" autocomplete="off">
+    <label class="form-label">🔗 URL（予約ページ・地図など）</label>
+    <input class="form-input" id="evUrl" placeholder="https://..." type="url" autocomplete="off">
     <label class="form-label">メモ（任意）</label>
     <textarea class="form-textarea" id="evNote" placeholder="詳細・予約番号など"></textarea>
     <div class="modal-btns">
@@ -987,6 +1112,41 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // URLパラメータで旅行コードを切り替え可能
 const shareCode = new URLSearchParams(location.search).get("trip") || "default";
+
+// ══════════════════════════════════════════════════════
+//  USER（名前でユーザー識別・localStorageに保存）
+// ══════════════════════════════════════════════════════
+let ME = localStorage.getItem('hawaii_user') || '';
+const USER_PALETTE = ['#0A6880','#E86B4E','#3A7D44','#7B5EA8','#D4A017','#1597B8','#C03E6B','#2E7D32','#5C6BC0','#F4511E'];
+
+function userColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return USER_PALETTE[h % USER_PALETTE.length];
+}
+
+function submitName() {
+  const v = document.getElementById('nameGateInput').value.trim();
+  if (!v) { document.getElementById('nameGateInput').focus(); return; }
+  ME = v;
+  localStorage.setItem('hawaii_user', ME);
+  document.getElementById('nameGateOverlay').classList.add('hidden');
+  showHeroUser();
+  renderPack();
+}
+
+function changeName() {
+  document.getElementById('nameGateInput').value = ME;
+  document.getElementById('nameGateOverlay').classList.remove('hidden');
+}
+
+function showHeroUser() {
+  if (!ME) return;
+  const wrap = document.getElementById('heroUserWrap');
+  const name = document.getElementById('heroUserName');
+  if (wrap) wrap.style.display = 'flex';
+  if (name) name.textContent = ME;
+}
 
 // ══════════════════════════════════════════════════════
 //  DEFAULT PACKING LIST（プリセット）
@@ -1226,6 +1386,12 @@ function renderItn() {
 
 function renderEvRow(ev, dayId) {
   const m = TYPE_META[ev.type] || TYPE_META.sight;
+  const addrHtml = ev.addr ? `<div class="tl-addr">📍 ${ev.addr}</div>` : '';
+  const mapUrl   = ev.addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.addr)}` : '';
+  const linksHtml = (ev.url || mapUrl) ? `<div class="tl-links">
+    ${ev.url  ? `<a class="tl-link" href="${ev.url}" target="_blank" rel="noopener">🔗 リンク</a>` : ''}
+    ${mapUrl  ? `<a class="tl-link" href="${mapUrl}" target="_blank" rel="noopener">🗺 地図</a>` : ''}
+  </div>` : '';
   return `
     <div class="tl-row">
       <div class="tl-time-col"><div class="tl-time">${ev.time || ''}</div></div>
@@ -1233,6 +1399,7 @@ function renderEvRow(ev, dayId) {
       <div class="tl-body">
         <span class="tl-badge ${m.bc}">${m.lbl}</span>
         <div class="tl-name">${ev.name || ''}</div>
+        ${addrHtml}${linksHtml}
         ${ev.note ? `<div class="tl-note">${ev.note}</div>` : ''}
       </div>
       <button class="tl-edit-btn" onclick="openEvModal('${dayId}','${ev.id}')">✏️</button>
@@ -1318,6 +1485,8 @@ function openEvModal(dayId, evId) {
     document.getElementById('evTime').value = ev.time  || '';
     document.getElementById('evType').value = ev.type  || 'sight';
     document.getElementById('evName').value = ev.name  || '';
+    document.getElementById('evAddr').value = ev.addr  || '';
+    document.getElementById('evUrl').value  = ev.url   || '';
     document.getElementById('evNote').value = ev.note  || '';
     document.getElementById('evDelBtn').style.display = '';
   } else {
@@ -1325,6 +1494,8 @@ function openEvModal(dayId, evId) {
     document.getElementById('evTime').value = '';
     document.getElementById('evType').value = 'sight';
     document.getElementById('evName').value = '';
+    document.getElementById('evAddr').value = '';
+    document.getElementById('evUrl').value  = '';
     document.getElementById('evNote').value = '';
     document.getElementById('evDelBtn').style.display = 'none';
   }
@@ -1341,6 +1512,8 @@ async function saveEv() {
     time: document.getElementById('evTime').value.trim(),
     type: document.getElementById('evType').value,
     name,
+    addr: document.getElementById('evAddr').value.trim(),
+    url:  document.getElementById('evUrl').value.trim(),
     note: document.getElementById('evNote').value.trim(),
   };
   if (editEvId) {
@@ -1470,20 +1643,32 @@ function packFilter(f) {
 function packSearch(q) { packQ = q.toLowerCase(); renderPack(); }
 
 async function packReset() {
-  if (!confirm('すべてのチェックをリセットしますか？')) return;
-  S.packChecked = {};
-  renderPack();
-  await saveState();
+  if (!ME) { alert('名前を設定してください'); return; }
+  if (!confirm('自分のチェックをすべてリセットしますか？')) return;
+  Object.keys(S.packChecked).forEach(id => {
+    if (S.packChecked[id] && typeof S.packChecked[id] === 'object') {
+      delete S.packChecked[id][ME];
+      if (Object.keys(S.packChecked[id]).length === 0) delete S.packChecked[id];
+    }
+  });
+  renderPack(); await saveState();
 }
 
 async function togglePack(itemId) {
-  // 現在の状態を反転
-  S.packChecked[itemId] = !S.packChecked[itemId];
-  // false になった場合はキーを削除してオブジェクトをクリーンに保つ
-  if (!S.packChecked[itemId]) delete S.packChecked[itemId];
-  renderPack();
-  if (S.packChecked[itemId]) confetti();
-  await saveState();
+  if (!ME) {
+    document.getElementById('nameGateOverlay').classList.remove('hidden');
+    return;
+  }
+  if (!S.packChecked[itemId]) S.packChecked[itemId] = {};
+  const current = !!S.packChecked[itemId][ME];
+  if (current) {
+    delete S.packChecked[itemId][ME];
+    if (Object.keys(S.packChecked[itemId]).length === 0) delete S.packChecked[itemId];
+  } else {
+    S.packChecked[itemId][ME] = true;
+    confetti();
+  }
+  renderPack(); await saveState();
 }
 
 async function deletePackItem(itemId, e) {
@@ -1491,77 +1676,98 @@ async function deletePackItem(itemId, e) {
   if (!confirm('このアイテムを削除しますか？')) return;
   S.packDeleted[itemId] = true;
   delete S.packChecked[itemId];
-  renderPack();
-  await saveState();
+  renderPack(); await saveState();
+}
+
+function allUsers() {
+  const names = new Set();
+  if (ME) names.add(ME);
+  Object.values(S.packChecked).forEach(obj => {
+    if (obj && typeof obj === 'object') Object.keys(obj).forEach(n => names.add(n));
+  });
+  return [...names].sort();
 }
 
 function renderPack() {
   const c = document.getElementById('packContainer');
   c.innerHTML = '';
-  let total = 0, done = 0;
+  let total = 0, allDoneCount = 0, mineCount = 0;
+  const users = allUsers();
+
+  // 参加者チップ
+  const pu = document.getElementById('packUsers');
+  if (pu) {
+    pu.innerHTML = users.length
+      ? '<span style="font-size:12px;color:var(--mid);margin-right:4px">参加者：</span>' +
+        users.map(u => {
+          const col = userColor(u), isMe = u === ME;
+          return `<div class="pack-user-chip" style="${isMe ? 'border-color:'+col+';background:'+col+'18' : ''}"><span class="pu-dot" style="background:${col}"></span><span class="pu-name" style="${isMe ? 'color:'+col : ''}">${u}${isMe ? ' (自分)' : ''}</span></div>`;
+        }).join('')
+      : '';
+  }
 
   DEFAULT_PACK.forEach(sec => {
     const activeItems = sec.items.filter(item => !S.packDeleted[item.id]);
-    let secDone = 0;
-
+    let secAllDone = 0;
     const rows = activeItems.map(item => {
-      const chk = !!S.packChecked[item.id];
-      total++;
-      if (chk) { done++; secDone++; }
-      const matchQ = !packQ
-        || item.name.toLowerCase().includes(packQ)
-        || (item.note || '').toLowerCase().includes(packQ);
-      const matchF = packFlt === 'all'
-        || (packFlt === 'checked'   && chk)
-        || (packFlt === 'unchecked' && !chk);
-      return { item, chk, vis: matchQ && matchF };
+      const chkObj = (S.packChecked[item.id] && typeof S.packChecked[item.id] === 'object') ? S.packChecked[item.id] : {};
+      const checkers = Object.keys(chkObj).filter(n => chkObj[n]);
+      const isMine = checkers.includes(ME);
+      const isAll  = users.length > 0 && users.every(u => checkers.includes(u));
+      total++; if (isAll) allDoneCount++; if (isMine) mineCount++; if (isAll) secAllDone++;
+      const matchQ = !packQ || item.name.toLowerCase().includes(packQ) || (item.note || '').toLowerCase().includes(packQ);
+      const matchF = packFlt === 'all' || (packFlt === 'checked' && isAll) || (packFlt === 'unchecked' && !isAll);
+      return { item, checkers, isMine, isAll, vis: matchQ && matchF };
     });
-
     if (!rows.some(r => r.vis)) return;
 
-    const allDone = activeItems.length > 0 && secDone === activeItems.length;
+    const secAllChecked = activeItems.length > 0 && secAllDone === activeItems.length;
     const wrap = document.createElement('div');
     wrap.className = 'psec';
     wrap.innerHTML = `
       <div class="psec-hdr" onclick="togglePSec('pl_${sec.id}', this)">
         <span class="psec-icon">${sec.icon}</span>
         <span class="psec-name">${sec.name}</span>
-        <span class="psec-count${allDone ? ' all-done' : ''}">${secDone}/${activeItems.length}</span>
+        <span class="psec-count${secAllChecked ? ' all-done' : ''}">${secAllDone}/${activeItems.length}</span>
         <span class="psec-chev open">▼</span>
       </div>
       <div class="pitems-list" id="pl_${sec.id}">
-        ${rows.map(({ item, chk, vis }) => `
-          <div class="pitem${chk ? ' checked' : ''}${!vis ? ' hidden' : ''}"
-               onclick="togglePack('${item.id}')">
-            <span class="pdot ${item.p || 'low'}"></span>
-            <div class="pchk"><span class="ptick">✓</span></div>
+        ${rows.map(({ item, checkers, isMine, isAll, vis }) => {
+          const myCol = ME ? userColor(ME) : '#0A6880';
+          let chips = '';
+          if (users.length) {
+            chips = users.map(u => {
+              const done = checkers.includes(u), uc = userColor(u), isM = u === ME;
+              const st = done ? 'background:'+uc+';border-color:'+uc : (isM ? 'border-color:'+uc+';color:'+uc : '');
+              const oc = isM ? `event.stopPropagation();togglePack('${item.id}')` : 'event.stopPropagation()';
+              return `<span class="pcheck-chip${isM?' mine-chip':''} ${done?'done':''}" style="${st}" onclick="${oc}">${done?'✓ ':''}${u}</span>`;
+            }).join('');
+          } else if (ME) {
+            const st = isMine ? 'background:'+myCol+';border-color:'+myCol : 'border-color:'+myCol+';color:'+myCol;
+            chips = `<span class="pcheck-chip mine-chip ${isMine?'done':''}" style="${st}" onclick="event.stopPropagation();togglePack('${item.id}')">${isMine?'✓ ':''}${ME}（タップでチェック）</span>`;
+          } else {
+            chips = '<span style="font-size:11px;color:#aac0c8">名前を設定するとチェックできます</span>';
+          }
+          return `<div class="pitem${isAll?' checked':''}${!vis?' hidden':''}" onclick="togglePack('${item.id}')">
+            <span class="pdot ${item.p||'low'}"></span>
             <div class="pbody">
-              <div class="pname">${item.name}</div>
-              ${item.note ? `<div class="pnote">${item.note}</div>` : ''}
+              <div class="pname"${isAll?' style="color:#94a3a8;text-decoration:line-through"':''}>${item.name}</div>
+              ${item.note?`<div class="pnote">${item.note}</div>`:''}
+              <div class="pitem-checks">${chips}</div>
             </div>
             <button class="pdel-btn" onclick="deletePackItem('${item.id}', event)" title="削除">✕</button>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>`;
     c.appendChild(wrap);
   });
 
   document.getElementById('pTotal').textContent = total;
-  document.getElementById('pDone').textContent  = done;
-  document.getElementById('pLeft').textContent  = total - done;
-
-  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('pDone').textContent  = allDoneCount;
+  document.getElementById('pLeft').textContent  = mineCount;
+  const pct = total ? Math.round(mineCount / total * 100) : 0;
   document.getElementById('heroBar').style.width = pct + '%';
-  document.getElementById('heroLbl').textContent = `持ち物 ${done} / ${total} 準備完了`;
-}
-
-function togglePSec(listId, hdr) {
-  const list = document.getElementById(listId);
-  const chev = hdr.querySelector('.psec-chev');
-  const open = list.style.display !== 'none' && list.style.display !== '';
-  list.style.display = open ? 'none' : '';
-  hdr.classList.toggle('collapsed', open);
-  chev.classList.toggle('open', !open);
+  document.getElementById('heroLbl').textContent = `自分の準備 ${mineCount} / ${total} 完了`;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1624,14 +1830,26 @@ db.channel('trip_plans_realtime')
 //  INIT
 // ══════════════════════════════════════════════════════
 (async () => {
-  await loadState();   // ← DB から読み込んでから
-  renderAll();         // ← レンダリング
+  await loadState();
+
+  // 名前が既に保存されていればゲートをスキップ
+  if (ME) {
+    document.getElementById('nameGateOverlay').classList.add('hidden');
+    showHeroUser();
+  }
+
+  renderAll();
 
   // ローディング画面を非表示
   const overlay = document.getElementById('loadingOverlay');
   overlay.classList.add('hidden');
   setTimeout(() => overlay.remove(), 500);
 })();
+
+// nameGateInputのEnterキー対応
+document.getElementById('nameGateInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitName();
+});
 </script>
 </body>
 </html>
