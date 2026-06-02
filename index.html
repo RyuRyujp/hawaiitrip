@@ -1114,9 +1114,19 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const shareCode = new URLSearchParams(location.search).get("trip") || "default";
 
 // ══════════════════════════════════════════════════════
-//  USER（名前でユーザー識別・localStorageに保存）
+//  USER（端末キーはlocalStorage、名前はDB保存）
 // ══════════════════════════════════════════════════════
-let ME = localStorage.getItem('hawaii_user') || '';
+
+// 端末固有キー（この端末がどのユーザーかを識別）
+let DEVICE_KEY = localStorage.getItem('hawaii_device_key');
+if (!DEVICE_KEY) {
+  DEVICE_KEY = 'dk_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('hawaii_device_key', DEVICE_KEY);
+}
+
+// 自分の名前（DBのS.users[DEVICE_KEY].nameから取得）
+let ME = '';
+
 const USER_PALETTE = ['#0A6880','#E86B4E','#3A7D44','#7B5EA8','#D4A017','#1597B8','#C03E6B','#2E7D32','#5C6BC0','#F4511E'];
 
 function userColor(name) {
@@ -1125,17 +1135,27 @@ function userColor(name) {
   return USER_PALETTE[h % USER_PALETTE.length];
 }
 
-function submitName() {
+// DBからロード後に自分の名前を復元
+function restoreMe() {
+  if (S.users && S.users[DEVICE_KEY]) {
+    ME = S.users[DEVICE_KEY].name || '';
+  }
+}
+
+async function submitName() {
   const v = document.getElementById('nameGateInput').value.trim();
   if (!v) { document.getElementById('nameGateInput').focus(); return; }
   ME = v;
-  localStorage.setItem('hawaii_user', ME);
+  // DBに保存（S.users に自分のエントリを書き込む）
+  if (!S.users) S.users = {};
+  S.users[DEVICE_KEY] = { name: ME, color: userColor(ME) };
   document.getElementById('nameGateOverlay').classList.add('hidden');
   showHeroUser();
   renderPack();
+  await saveState();
 }
 
-function changeName() {
+async function changeName() {
   document.getElementById('nameGateInput').value = ME;
   document.getElementById('nameGateOverlay').classList.remove('hidden');
 }
@@ -1226,8 +1246,9 @@ const DEFAULT_PACK = [
 let S = {
   days:        [],   // 旅程
   memos:       [],   // メモ
-  packChecked: {},   // { itemId: true }
+  packChecked: {},   // { itemId: { userName: true } }
   packDeleted: {},   // { itemId: true }
+  users:       {},   // { deviceKey: { name, color } }
 };
 
 // Realtime の重複更新を防ぐフラグ
@@ -1261,6 +1282,7 @@ async function loadState() {
         memos:       Array.isArray(data.data.memos)       ? data.data.memos       : [],
         packChecked: data.data.packChecked && typeof data.data.packChecked === 'object' ? data.data.packChecked : {},
         packDeleted: data.data.packDeleted && typeof data.data.packDeleted === 'object' ? data.data.packDeleted : {},
+        users:       data.data.users       && typeof data.data.users       === 'object' ? data.data.users       : {},
       };
     }
     // data === null の場合は S のデフォルト値をそのまま使う
@@ -1680,12 +1702,14 @@ async function deletePackItem(itemId, e) {
 }
 
 function allUsers() {
-  const names = new Set();
-  if (ME) names.add(ME);
-  Object.values(S.packChecked).forEach(obj => {
-    if (obj && typeof obj === 'object') Object.keys(obj).forEach(n => names.add(n));
-  });
-  return [...names].sort();
+  // S.users に登録されている全ユーザー名のリスト（表示順は名前順）
+  if (!S.users) return ME ? [ME] : [];
+  const names = Object.values(S.users)
+    .filter(u => u && u.name)
+    .map(u => u.name);
+  // 自分が未登録でも含める
+  if (ME && !names.includes(ME)) names.push(ME);
+  return [...new Set(names)].sort();
 }
 
 function renderPack() {
@@ -1771,6 +1795,19 @@ function renderPack() {
 }
 
 // ══════════════════════════════════════════════════════
+//  PACK SECTION TOGGLE
+// ══════════════════════════════════════════════════════
+function togglePSec(listId, hdr) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const chev = hdr.querySelector('.psec-chev');
+  const isOpen = list.style.display !== 'none' && list.style.display !== '';
+  list.style.display = isOpen ? 'none' : 'block';
+  hdr.classList.toggle('collapsed', isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+
+// ══════════════════════════════════════════════════════
 //  MODAL HELPERS
 // ══════════════════════════════════════════════════════
 function overlayClose(e, id) {
@@ -1818,8 +1855,11 @@ db.channel('trip_plans_realtime')
           memos:       Array.isArray(d.memos)       ? d.memos       : [],
           packChecked: d.packChecked && typeof d.packChecked === 'object' ? d.packChecked : {},
           packDeleted: d.packDeleted && typeof d.packDeleted === 'object' ? d.packDeleted : {},
+          users:       d.users       && typeof d.users       === 'object' ? d.users       : {},
         };
         renderAll();
+        restoreMe();
+        showHeroUser();
         showSync('同期しました ↻');
       }
     }
@@ -1832,7 +1872,10 @@ db.channel('trip_plans_realtime')
 (async () => {
   await loadState();
 
-  // 名前が既に保存されていればゲートをスキップ
+  // DBから自分の名前を復元
+  restoreMe();
+
+  // 名前が既にあればゲートをスキップ
   if (ME) {
     document.getElementById('nameGateOverlay').classList.add('hidden');
     showHeroUser();
