@@ -2075,8 +2075,8 @@ db.channel('trip_plans_realtime')
 // ══════════════════════════════════════════════════════
 //  AI ENDPOINT（Vercel環境では /api/ai、それ以外は直接）
 // ══════════════════════════════════════════════════════
-// Vercelにデプロイして /api/ai 経由にしたい場合は true に変更
-const AI_USE_PROXY = typeof window.AI_USE_PROXY !== 'undefined' ? window.AI_USE_PROXY : false;
+// vercel.app ドメインまたは localhost以外ならプロキシ経由
+const AI_USE_PROXY = !(location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
 async function callAI({ system, userMsg, maxTokens = 512 }) {
   if (AI_USE_PROXY) {
