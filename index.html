@@ -2073,32 +2073,6 @@ db.channel('trip_plans_realtime')
   .subscribe();
 
 // ══════════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════════
-(async () => {
-  await loadState();
-
-  // DBから自分の名前を復元
-  restoreMe();
-
-  // 名前が既にあればゲートをスキップ
-  if (ME) {
-    document.getElementById('nameGateOverlay').classList.add('hidden');
-    showHeroUser();
-  }
-
-  renderAll();
-
-  // ヒントカードを表示（キャッシュ優先、なければAPI呼び出し）
-  fetchHint(false);
-
-  // ローディング画面を非表示
-  const overlay = document.getElementById('loadingOverlay');
-  overlay.classList.add('hidden');
-  setTimeout(() => overlay.remove(), 500);
-})();
-
-// ══════════════════════════════════════════════════════
 //  AI ENDPOINT（Vercel環境では /api/ai、それ以外は直接）
 // ══════════════════════════════════════════════════════
 // Vercelにデプロイして /api/ai 経由にしたい場合は true に変更
@@ -2405,6 +2379,32 @@ async function aiSend() {
     aiUpdateLimitUI();
   }
 }
+
+// ══════════════════════════════════════════════════════
+//  INIT（全関数定義の後に実行）
+// ══════════════════════════════════════════════════════
+(async () => {
+  await loadState();
+
+  // DBから自分の名前を復元
+  restoreMe();
+
+  // 名前が既にあればゲートをスキップ
+  if (ME) {
+    document.getElementById('nameGateOverlay').classList.add('hidden');
+    showHeroUser();
+  }
+
+  renderAll();
+
+  // ヒントカードを表示（キャッシュ優先、なければAPI呼び出し）
+  fetchHint(false);
+
+  // ローディング画面を非表示
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500);
+})();
 
 
 </script>
