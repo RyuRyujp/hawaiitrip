@@ -879,48 +879,40 @@ body {
 
 /* ─── AI HINT CARD ─── */
 .hint-card {
-  margin: 14px 14px 0;
-  background: linear-gradient(135deg, #0A5870 0%, #0D8FB5 100%);
-  border-radius: 16px;
-  padding: 13px 16px;
-  display: flex; align-items: flex-start; gap: 11px;
-  box-shadow: 0 2px 12px rgba(10,104,128,.18);
+  margin: 12px 14px 0;
+  background: #fff;
+  border-radius: 14px;
+  padding: 13px 14px 13px 16px;
+  display: flex; align-items: flex-start; gap: 10px;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--ocean2);
   animation: fadeUp .4s ease both;
-  position: relative; overflow: hidden;
-  cursor: default;
-}
-.hint-card::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 80% 60% at 90% 50%, rgba(255,255,255,.07) 0%, transparent 70%);
-  pointer-events: none;
 }
 .hint-icon {
-  font-size: 20px; flex-shrink: 0; margin-top: 1px; line-height: 1;
+  font-size: 18px; flex-shrink: 0; line-height: 1; margin-top: 1px;
 }
 .hint-body { flex: 1; min-width: 0; }
 .hint-label {
-  font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
-  text-transform: uppercase; color: rgba(255,255,255,.55);
+  font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--ocean2);
   margin-bottom: 3px;
 }
 .hint-text {
-  font-size: 13px; color: #FFFFFF; line-height: 1.55;
-  font-weight: 500;
+  font-size: 13px; color: var(--dark); line-height: 1.6;
 }
 .hint-refresh {
-  background: none; border: none; color: rgba(255,255,255,.4);
-  font-size: 14px; cursor: pointer; padding: 2px 4px;
-  flex-shrink: 0; transition: color .15s, transform .3s;
-  -webkit-tap-highlight-color: transparent;
+  background: none; border: none; color: var(--border);
+  font-size: 13px; cursor: pointer; padding: 2px 4px;
+  flex-shrink: 0; transition: color .15s, transform .35s;
+  -webkit-tap-highlight-color: transparent; margin-top: 1px;
 }
-.hint-refresh:hover { color: rgba(255,255,255,.8); }
+.hint-refresh:hover { color: var(--ocean2); }
 .hint-refresh.spin { transform: rotate(360deg); }
 .hint-skeleton {
-  height: 13px; background: rgba(255,255,255,.15);
+  height: 11px; background: var(--sky2);
   border-radius: 6px; animation: shimmer 1.4s infinite;
 }
-.hint-skeleton.short { width: 55%; margin-top: 6px; }
+.hint-skeleton.short { width: 60%; margin-top: 5px; }
 @keyframes shimmer {
   0%,100% { opacity: .5; } 50% { opacity: 1; }
 }
@@ -1100,10 +1092,10 @@ body {
 
 <!-- AI HINT CARD -->
 <div class="hint-card" id="hintCard" style="display:none">
-  <div class="hint-icon" id="hintIcon">✨</div>
+  <div class="hint-icon" id="hintIcon">🌺</div>
   <div class="hint-body">
-    <div class="hint-label">AI</div>
-    <div id="hintText">
+    <div class="hint-label">旅のひとこと</div>
+    <div class="hint-text" id="hintText">
       <div class="hint-skeleton"></div>
       <div class="hint-skeleton short"></div>
     </div>
@@ -2109,14 +2101,22 @@ db.channel('trip_plans_realtime')
 // ══════════════════════════════════════════════════════
 //  AI ENDPOINT（Vercel環境では /api/ai、それ以外は直接）
 // ══════════════════════════════════════════════════════
-const AI_ENDPOINT = location.hostname === 'localhost' || location.hostname.includes('vercel.app') || location.protocol === 'file:'
-  ? '/api/ai'
-  : 'https://api.anthropic.com/v1/messages';
-const AI_DIRECT = !AI_ENDPOINT.startsWith('/');
+// Vercelにデプロイして /api/ai 経由にしたい場合は true に変更
+const AI_USE_PROXY = typeof window.AI_USE_PROXY !== 'undefined' ? window.AI_USE_PROXY : false;
 
 async function callAI({ system, userMsg, maxTokens = 512 }) {
-  if (AI_DIRECT) {
-    // Artifact内（直接呼び出し）
+  if (AI_USE_PROXY) {
+    // Vercel API Route経由（本番デプロイ時）
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, userMsg, maxTokens }),
+    });
+    if (!res.ok) throw new Error('proxy error ' + res.status);
+    const data = await res.json();
+    return data?.text || '';
+  } else {
+    // Anthropic API直接呼び出し（Artifact / ローカル開発）
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2127,17 +2127,9 @@ async function callAI({ system, userMsg, maxTokens = 512 }) {
         messages: [{ role: 'user', content: userMsg }],
       }),
     });
+    if (!res.ok) throw new Error('api error ' + res.status);
     const data = await res.json();
     return data?.content?.[0]?.text || '';
-  } else {
-    // Vercel API Route経由
-    const res = await fetch('/api/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system, userMsg, maxTokens }),
-    });
-    const data = await res.json();
-    return data?.text || '';
   }
 }
 
@@ -2174,13 +2166,14 @@ async function fetchHint(force = false) {
     if (cached) {
       card.style.display = 'flex';
       textEl.textContent = cached.text;
-      iconEl.textContent = cached.icon || '✨';
+      iconEl.textContent = cached.icon || '🌺';
       return;
     }
   }
 
   // ローディング
   card.style.display = 'flex';
+  if (force) localStorage.removeItem(HINT_CACHE_KEY);
   textEl.innerHTML = '<div class="hint-skeleton"></div><div class="hint-skeleton short"></div>';
   refreshBtn.classList.add('spin');
   setTimeout(() => refreshBtn.classList.remove('spin'), 400);
@@ -2200,22 +2193,24 @@ async function fetchHint(force = false) {
   const uncheckedCount = DEFAULT_PACK.flatMap(s => s.items)
     .filter(item => !S.packDeleted?.[item.id] && !(S.packChecked?.[item.id]?.[ME])).length;
 
-  const system = `あなたはハワイ旅行のAIアシスタントです。今日は${today}。${daysUntil ? daysUntil+'。' : ''}${ME ? 'ユーザー名は'+ME+'。' : ''}未チェックの持ち物が${uncheckedCount}件あります。旅程：${(S.days||[]).map(d=>d.label+' '+d.date).join('、') || 'なし'}。
+  const system = `あなたはハワイ旅行のアシスタントです。今日は${today}。${daysUntil ? daysUntil+'。' : ''}${ME ? 'ユーザーは'+ME+'さん。' : ''}未チェックの持ち物が${uncheckedCount}件。旅程：${(S.days||[]).map(d=>d.label+' '+d.date).join('、') || 'なし'}。
 
-旅行の準備・当日・ハワイ現地に関する短いヒントや励ましのメッセージを1文（30〜50字程度）で返してください。絵文字は使わず、テキストのみで。毎回違う観点から。`;
+状況に合わせた自然な一言を返してください。「ヒント」「アドバイス」「おすすめ」「チェック」などの言葉は使わず、まるで旅慣れた友人が旅行前に軽く声をかけるような、さりげない一文にしてください。25〜40字程度。絵文字なし。`;
 
   try {
-    const text = await callAI({ system, userMsg: 'ヒントをください', maxTokens: 120 });
+    const text = await callAI({ system, userMsg: 'お願いします', maxTokens: 100 });
     if (text) {
       const icon = HINT_ICONS[Math.floor(Math.random() * HINT_ICONS.length)];
       hintCacheSave(text.trim(), icon);
       textEl.textContent = text.trim();
       iconEl.textContent = icon;
     } else {
-      textEl.textContent = '旅行の準備を少しずつ進めていきましょう！';
+      textEl.textContent = 'パスポートと充電器、忘れずに。';
+      iconEl.textContent = '🌺';
     }
   } catch {
-    textEl.textContent = '旅行の準備を少しずつ進めていきましょう！';
+    textEl.textContent = 'パスポートと充電器、忘れずに。';
+    iconEl.textContent = '🌺';
   }
 }
 
