@@ -880,15 +880,20 @@ body {
 /* ─── AI CHAT ─── */
 .ai-fab {
   position: fixed; bottom: 24px; right: 20px; z-index: 400;
-  width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, #0A6880, #1597B8);
-  border: none; color: #fff; font-size: 24px; cursor: pointer;
-  box-shadow: 0 4px 20px rgba(10,104,128,.4);
+  width: 56px; height: 56px; border-radius: 18px;
+  background: linear-gradient(145deg, #0e1f3d 0%, #0A6880 60%, #1597B8 100%);
+  border: none; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 24px rgba(10,104,128,.45), 0 0 0 1px rgba(255,255,255,.08) inset;
   display: flex; align-items: center; justify-content: center;
-  transition: transform .2s, box-shadow .2s;
+  transition: transform .2s, box-shadow .2s, border-radius .2s;
   -webkit-tap-highlight-color: transparent;
 }
-.ai-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(10,104,128,.5); }
+.ai-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 8px 32px rgba(10,104,128,.55), 0 0 0 1px rgba(255,255,255,.12) inset;
+  border-radius: 20px;
+}
+.ai-fab svg { width: 26px; height: 26px; }
 .ai-fab .ai-badge {
   position: absolute; top: -4px; right: -4px;
   background: var(--coral); color: #fff; font-size: 10px; font-weight: 700;
@@ -1209,8 +1214,13 @@ body {
 <div class="cfwrap" id="cfwrap"></div>
 
 <!-- AI CHAT FAB -->
-<button class="ai-fab" id="aiFab" onclick="toggleAiDrawer()">
-  🤖<span class="ai-badge" id="aiBadge"></span>
+<button class="ai-fab" id="aiFab" onclick="toggleAiDrawer()" aria-label="AIアシスタント">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="white" opacity="0.95"/>
+    <path d="M19 16L19.8 18.2L22 19L19.8 19.8L19 22L18.2 19.8L16 19L18.2 18.2L19 16Z" fill="white" opacity="0.7"/>
+    <path d="M6 3L6.6 4.9L8.5 5.5L6.6 6.1L6 8L5.4 6.1L3.5 5.5L5.4 4.9L6 3Z" fill="white" opacity="0.55"/>
+  </svg>
+  <span class="ai-badge" id="aiBadge"></span>
 </button>
 
 <!-- AI CHAT DRAWER -->
