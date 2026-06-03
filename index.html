@@ -2086,8 +2086,8 @@ async function callAI({ system, userMsg, maxTokens = 512 }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system, userMsg, maxTokens }),
     });
-    if (!res.ok) throw new Error('proxy error ' + res.status);
     const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'proxy error ' + res.status);
     return data?.text || '';
   } else {
     // Anthropic API直接呼び出し（Artifact / ローカル開発）
@@ -2373,7 +2373,7 @@ async function aiSend() {
   } catch (e) {
     console.error('AI error:', e);
     loadingDiv.classList.remove('loading');
-    loadingDiv.querySelector('.ai-bubble').textContent = 'エラーが発生しました。ネットワークを確認してください。';
+    loadingDiv.querySelector('.ai-bubble').textContent = `エラー: ${e.message}`;
   } finally {
     aiSending = false;
     aiUpdateLimitUI();

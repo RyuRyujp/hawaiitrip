@@ -1,8 +1,8 @@
 // api/ai.js — Vercel Serverless Function
-// ANTHROPIC_API_KEY を Vercel の Environment Variables に設定してください
+// Vercel Dashboard > Settings > Environment Variables に
+// ANTHROPIC_API_KEY を追加してください
 
 export default async function handler(req, res) {
-  // CORS ヘッダー
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -11,7 +11,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
+  if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY is not set');
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured in Vercel environment variables' });
+  }
 
   const { system, userMsg, maxTokens = 512 } = req.body || {};
   if (!userMsg) return res.status(400).json({ error: 'userMsg is required' });
@@ -33,11 +36,15 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || 'API error' });
+
+    if (!response.ok) {
+      console.error('Anthropic error:', JSON.stringify(data));
+      return res.status(response.status).json({ error: data?.error?.message || 'Anthropic API error' });
+    }
 
     return res.status(200).json({ text: data?.content?.[0]?.text || '' });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Fetch error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 }
