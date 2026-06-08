@@ -2154,40 +2154,74 @@ async function fetchHint(force = false) {
   refreshBtn.classList.add('spin');
   setTimeout(() => refreshBtn.classList.remove('spin'), 400);
 
-  // コンテキスト生成（軽量版）
-  const today = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  // ─── コンテキストの再構築 ───
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  
+  // 出発までの日数計算
   const firstDay = S.days && S.days[0];
-  let daysUntil = '';
+  let daysUntilText = '日程未定';
+  let currentStatus = 'before_trip'; // before_trip, today, during_trip
+  
   if (firstDay?.date) {
     const m = firstDay.date.match(/(\d+)月(\d+)日/);
     if (m) {
-      const dep = new Date(new Date().getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
-      const diff = Math.ceil((dep - new Date()) / 86400000);
-      daysUntil = diff > 0 ? `出発まであと${diff}日` : diff === 0 ? '今日が出発日！' : '旅行中';
+      const dep = new Date(today.getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+      const diff = Math.ceil((dep - today) / 86400000);
+      if (diff > 0) {
+        daysUntilText = `出発まであと ${diff} 日`;
+        currentStatus = 'before_trip';
+      } else if (diff === 0) {
+        daysUntilText = '今日が出発日！';
+        currentStatus = 'today';
+      } else {
+        daysUntilText = 'ハワイ旅行中';
+        currentStatus = 'during_trip';
+      }
     }
   }
-  const uncheckedCount = DEFAULT_PACK.flatMap(s => s.items)
-    .filter(item => !S.packDeleted?.[item.id] && !(S.packChecked?.[item.id]?.[ME])).length;
 
-  const system = `あなたはハワイ旅行のアシスタントです。今日は${today}。${daysUntil ? daysUntil+'。' : ''}${ME ? 'ユーザーは'+ME+'さん。' : ''}未チェックの持ち物が${uncheckedCount}件。旅程：${(S.days||[]).map(d=>d.label+' '+d.date).join('、') || 'なし'}。
+  // 旅程のハイライト（最初の2日分、または登録されているイベントを抽出）
+  let itinerarySummary = '';
+  if (S.days && S.days.length > 0) {
+    itinerarySummary = S.days.slice(0, 3).map(d => {
+      const evNames = (d.events || []).slice(0, 2).map(e => e.name).join('や');
+      return `・${d.label}(${d.date}): ${d.title || ''} ${evNames ? `[予定: ${evNames}]` : ''}`;
+    }).join('\n');
+  }
 
-状況に合わせた自然な一言を返してください。持ち物だけに言及するのではなく、旅行中は旅程にあったアドバイスなどをしてください。「ヒント」「アドバイス」「おすすめ」「チェック」などの言葉は使わず、まるで旅慣れた友人が旅行前に軽く声をかけるような、さりげない一文にしてください。25〜40字程度。絵文字なし。`;
+  // あえて持ち物の具体的なカウントは渡さず、「準備中」というステータスのみにする
+  const system = `あなたはハワイ旅行のベテランであり、ユーザー（${ME || '旅行者'}さん）の旅を応援する気の利いた友人です。
+
+【現在の状況】
+今日の日付: ${todayStr}
+旅行ステータス: ${daysUntilText} (${currentStatus})
+登録されている旅程の抜粋:
+${itinerarySummary || '（まだ旅程が登録されていません）'}
+
+【あなたに課されたルール】
+1. ユーザーの現在の状況（出発前、当日、旅行中）や、登録されている具体的な予定（観光、ビーチ、食事、ホテルなど）に寄り添った、実用的またはワクワクする現地目線のアドバイスを一言で伝えてください。
+2. 持ち物やパッキング、チェックリストに関する言及は【厳禁】とします。
+3. 「ヒント」「アドバイス」「おすすめ」などの説明的なワードは使わず、独り言や、旅慣れた友人がフランクに声をかけるような自然な口調にしてください。
+4. 25〜45文字程度で、絶対に絵文字は使わないでください。`;
 
   try {
-    const text = await callAI({ system, userMsg: 'お願いします', maxTokens: 100 });
+    const text = await callAI({ system, userMsg: 'ハワイ旅行について、今の一言をどうぞ', maxTokens: 100 });
     if (text) {
       const icon = HINT_ICONS[Math.floor(Math.random() * HINT_ICONS.length)];
       hintCacheSave(text.trim(), icon);
       textEl.textContent = text.trim();
       iconEl.textContent = icon;
     } else {
-      textEl.textContent = 'パスポートと充電器、忘れずに。';
+      textEl.textContent = 'まずはのんびり、ビーチの風を感じる計画から。';
       iconEl.textContent = '🌺';
     }
   } catch {
-    textEl.textContent = 'パスポートと充電器、忘れずに。';
+    textEl.textContent = 'まずはのんびり、ビーチの風を感じる計画から。';
     iconEl.textContent = '🌺';
   }
+}
+
 }
 
 // ══════════════════════════════════════════════════════
